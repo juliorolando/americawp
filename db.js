@@ -209,6 +209,23 @@ function getStats() {
   return { msgsToday, chatsToday, sinRespuesta };
 }
 
+function getContacts() {
+  return db.prepare(`
+    SELECT
+      c.id,
+      c.phone_or_name,
+      c.first_seen,
+      c.status,
+      COUNT(m.id) AS message_count,
+      (SELECT timestamp FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_message_ts
+    FROM chats c
+    LEFT JOIN messages m ON m.chat_id = c.id
+    WHERE c.hidden = 0
+    GROUP BY c.id
+    ORDER BY c.phone_or_name COLLATE NOCASE ASC
+  `).all();
+}
+
 function hideChat(id)     { db.prepare('UPDATE chats SET hidden = 1 WHERE id = ?').run(id); }
 function unhideChat(id)   { db.prepare('UPDATE chats SET hidden = 0 WHERE id = ?').run(id); }
 function setStatus(id, status) { db.prepare('UPDATE chats SET status = ? WHERE id = ?').run(status, id); }
@@ -230,4 +247,4 @@ function getHiddenChats() {
   `).all();
 }
 
-module.exports = { db, upsertChat, saveMessage, saveMessagesBatch, getChats, getMessages, getChat, getStats, getPendingChats, searchMessages, getActivityStats, hideChat, unhideChat, getHiddenChats, setStatus, setNotes };
+module.exports = { db, upsertChat, saveMessage, saveMessagesBatch, getChats, getMessages, getChat, getStats, getPendingChats, searchMessages, getActivityStats, getContacts, hideChat, unhideChat, getHiddenChats, setStatus, setNotes };

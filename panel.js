@@ -6,7 +6,7 @@ const path    = require('path');
 const { getChats, getChat, getMessages, upsertChat, saveMessage, saveMessagesBatch,
         getStats, getPendingChats, searchMessages, getActivityStats,
         hideChat, unhideChat, getHiddenChats,
-        setStatus, setNotes } = require('./db');
+        setStatus, setNotes, getContacts } = require('./db');
 
 function categorize(text) {
   const t = (text || '').toLowerCase();
@@ -158,6 +158,11 @@ app.post('/chat/:id/notes', requireAuth, (req, res) => {
 app.post('/chat/:id/show', requireAuth, (req, res) => {
   unhideChat(req.params.id);
   res.redirect('/ocultos');
+});
+
+app.get('/contactos', requireAuth, (req, res) => {
+  const contacts = getContacts();
+  res.render('contactos', { contacts });
 });
 
 app.get('/ocultos', requireAuth, (req, res) => {
