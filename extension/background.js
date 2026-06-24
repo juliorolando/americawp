@@ -1,4 +1,4 @@
-const API_BASE  = 'https://hosteriaamerica.com';
+const API_BASE  = 'https://panel.hosteriaamerica.com';
 const API_KEY   = '48454d00e4c9a63acad716afd6c23b3c368047f4ddf30a6a352d81a46f052817';
 
 const API_URL   = `${API_BASE}/api/message`;

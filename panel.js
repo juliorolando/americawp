@@ -4,7 +4,8 @@ const express = require('express');
 const session = require('express-session');
 const path    = require('path');
 const { getChats, getChat, getMessages, upsertChat, saveMessage, saveMessagesBatch,
-        getStats, getPendingChats, searchMessages, getActivityStats } = require('./db');
+        getStats, getPendingChats, searchMessages, getActivityStats,
+        hideChat, unhideChat, getHiddenChats } = require('./db');
 
 function categorize(text) {
   const t = (text || '').toLowerCase();
@@ -129,6 +130,24 @@ app.post('/api/message', requireApiKey, (req, res) => {
     console.error('[API] Error guardando mensaje:', err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Ocultar / mostrar chats
+// ---------------------------------------------------------------------------
+app.post('/chat/:id/hide', requireAuth, (req, res) => {
+  hideChat(req.params.id);
+  res.json({ ok: true });
+});
+
+app.post('/chat/:id/show', requireAuth, (req, res) => {
+  unhideChat(req.params.id);
+  res.redirect('/ocultos');
+});
+
+app.get('/ocultos', requireAuth, (req, res) => {
+  const chats = getHiddenChats();
+  res.render('ocultos', { chats });
 });
 
 // ---------------------------------------------------------------------------

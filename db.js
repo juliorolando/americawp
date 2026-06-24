@@ -38,6 +38,14 @@ try {
   }
 } catch (_) {}
 
+// Migración: columna hidden en chats
+try {
+  const chatCols = db.prepare('PRAGMA table_info(chats)').all();
+  if (!chatCols.find(c => c.name === 'hidden')) {
+    db.exec('ALTER TABLE chats ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
+  }
+} catch (_) {}
+
 const stmts = {
   findChat:    db.prepare('SELECT id FROM chats WHERE phone_or_name = ?'),
   updateChat:  db.prepare('UPDATE chats SET last_seen = ? WHERE id = ?'),
@@ -53,11 +61,13 @@ const stmts = {
       COUNT(m.id) AS message_count,
       (SELECT body      FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_message,
       (SELECT direction FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_direction,
+      (SELECT timestamp FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_message_ts,
       (SELECT GROUP_CONCAT(body, ' ') FROM (SELECT body FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 30)) AS sample_text
     FROM chats c
     LEFT JOIN messages m ON m.chat_id = c.id
+    WHERE c.hidden = 0
     GROUP BY c.id
-    ORDER BY c.last_seen DESC
+    ORDER BY last_message_ts DESC
   `),
   getChat:     db.prepare('SELECT * FROM chats WHERE id = ?'),
   getMsgs:     db.prepare('SELECT * FROM messages WHERE chat_id = ? ORDER BY timestamp ASC'),
@@ -192,4 +202,23 @@ function getStats() {
   return { msgsToday, chatsToday, sinRespuesta };
 }
 
-module.exports = { db, upsertChat, saveMessage, saveMessagesBatch, getChats, getMessages, getChat, getStats, getPendingChats, searchMessages, getActivityStats };
+function hideChat(id)   { db.prepare('UPDATE chats SET hidden = 1 WHERE id = ?').run(id); }
+function unhideChat(id) { db.prepare('UPDATE chats SET hidden = 0 WHERE id = ?').run(id); }
+
+function getHiddenChats() {
+  return db.prepare(`
+    SELECT
+      c.id,
+      c.phone_or_name,
+      COUNT(m.id) AS message_count,
+      (SELECT body      FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_message,
+      (SELECT timestamp FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_message_ts
+    FROM chats c
+    LEFT JOIN messages m ON m.chat_id = c.id
+    WHERE c.hidden = 1
+    GROUP BY c.id
+    ORDER BY last_message_ts DESC
+  `).all();
+}
+
+module.exports = { db, upsertChat, saveMessage, saveMessagesBatch, getChats, getMessages, getChat, getStats, getPendingChats, searchMessages, getActivityStats, hideChat, unhideChat, getHiddenChats };

@@ -5,7 +5,7 @@
   "description": "Registra mensajes de WhatsApp Web en el panel de supervisión local",
   "host_permissions": [
     "https://web.whatsapp.com/*",
-    "https://hosteriaamerica.com/*"
+    "https://panel.hosteriaamerica.com/*"
   ],
   "background": {
     "service_worker": "background.js"

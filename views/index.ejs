@@ -52,6 +52,16 @@
     .chat-list { display: flex; flex-direction: column; gap: 6px; }
     .chat-card { background: #fff; border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; box-shadow: 0 1px 2px rgba(0,0,0,.07); transition: box-shadow .15s, transform .1s; border-left: 3px solid transparent; }
     .chat-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,.11); transform: translateY(-1px); }
+    .chat-card-wrap { position: relative; }
+    .hide-btn {
+      position: absolute; top: 50%; right: 10px; transform: translateY(-50%);
+      background: rgba(255,255,255,.92); border: 1px solid #e0e0e0; border-radius: 4px;
+      width: 22px; height: 22px; font-size: .85rem; line-height: 1; cursor: pointer;
+      color: #bbb; opacity: 0; transition: opacity .2s, color .15s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .chat-card-wrap:hover .hide-btn { opacity: 1; }
+    .hide-btn:hover { color: #e53935; border-color: #ef9a9a; }
     .chat-card.sin-resp { border-left-color: #e53935; }
     .avatar { width: 43px; height: 43px; border-radius: 50%; background: #128C7E; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; font-weight: 700; flex-shrink: 0; }
     .chat-info { flex: 1; min-width: 0; }
@@ -89,6 +99,7 @@
     <a href="/pendientes">Pendientes <% if(stats.sinRespuesta > 0){ %><span style="background:#e53935;color:#fff;border-radius:10px;padding:1px 6px;font-size:.65rem;margin-left:2px;"><%= stats.sinRespuesta %></span><% } %></a>
     <a href="/estadisticas">Estadísticas</a>
     <a href="/buscar">Buscar</a>
+    <a href="/ocultos">Ocultos</a>
   </nav>
 
   <main>
@@ -136,7 +147,7 @@
       <div class="chat-list" id="chat-list">
         <% chats.forEach(function(chat) {
           const initial = (chat.phone_or_name || '?')[0].toUpperCase();
-          const d       = new Date(chat.last_seen);
+          const d       = new Date(chat.last_message_ts || chat.last_seen);
           const today   = new Date();
           const isToday = d.toDateString() === today.toDateString();
           const sinResp = chat.last_direction === 'in';
@@ -150,25 +161,28 @@
               : d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
           }
         %>
-          <a class="chat-card <%= sinResp && isToday ? 'sin-resp' : '' %>"
-             href="/chat/<%= chat.id %>"
-             data-name="<%= chat.phone_or_name.toLowerCase() %>"
-             data-cat="<%= chat.category.label %>">
-            <div class="avatar"><%= initial %></div>
-            <div class="chat-info">
-              <div class="chat-name-row">
-                <div class="chat-name"><%= chat.phone_or_name %></div>
-                <span class="cat-badge" style="background:<%= chat.category.bg %>;color:<%= chat.category.color %>;"><%= chat.category.label %></span>
-                <% if (isToday)  { %><span class="badge badge-hoy">HOY</span><% } %>
-                <% if (sinResp && isToday) { %><span class="badge badge-sinr">SIN RESP</span><% } %>
+          <div class="chat-card-wrap"
+               data-name="<%= chat.phone_or_name.toLowerCase() %>"
+               data-cat="<%= chat.category.label %>">
+            <a class="chat-card <%= sinResp && isToday ? 'sin-resp' : '' %>"
+               href="/chat/<%= chat.id %>">
+              <div class="avatar"><%= initial %></div>
+              <div class="chat-info">
+                <div class="chat-name-row">
+                  <div class="chat-name"><%= chat.phone_or_name %></div>
+                  <span class="cat-badge" style="background:<%= chat.category.bg %>;color:<%= chat.category.color %>;"><%= chat.category.label %></span>
+                  <% if (isToday)  { %><span class="badge badge-hoy">HOY</span><% } %>
+                  <% if (sinResp && isToday) { %><span class="badge badge-sinr">SIN RESP</span><% } %>
+                </div>
+                <div class="chat-preview <%= chat.last_direction === 'out' ? 'out' : '' %>"><%= chat.last_message || '—' %></div>
               </div>
-              <div class="chat-preview <%= chat.last_direction === 'out' ? 'out' : '' %>"><%= chat.last_message || '—' %></div>
-            </div>
-            <div class="chat-meta">
-              <div class="chat-time"><%= timeLabel %></div>
-              <div class="chat-count"><%= chat.message_count %></div>
-            </div>
-          </a>
+              <div class="chat-meta">
+                <div class="chat-time"><%= timeLabel %></div>
+                <div class="chat-count"><%= chat.message_count %></div>
+              </div>
+            </a>
+            <button class="hide-btn" data-id="<%= chat.id %>" onclick="ocultarChat(event, this)" title="Ocultar conversación">×</button>
+          </div>
         <% }); %>
       </div>
       <div id="no-results">No se encontraron chats.</div>
@@ -187,7 +201,7 @@
     function applyFilters() {
       if (!list) return;
       const q     = (search ? search.value.toLowerCase().trim() : '');
-      const cards = list.querySelectorAll('.chat-card');
+      const cards = list.querySelectorAll('.chat-card-wrap');
       let vis     = 0;
       cards.forEach(card => {
         const nameOk = !q || card.dataset.name.includes(q);
@@ -211,6 +225,21 @@
         applyFilters();
       });
     });
+
+    function ocultarChat(e, btn) {
+      e.stopPropagation();
+      const wrap = btn.closest('.chat-card-wrap');
+      fetch('/chat/' + btn.dataset.id + '/hide', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+          if (d.ok) {
+            wrap.style.transition = 'opacity .25s';
+            wrap.style.opacity = '0';
+            setTimeout(() => wrap.remove(), 260);
+          }
+        })
+        .catch(() => {});
+    }
 
     // Auto-refresh cada 30 s, solo si el usuario no está filtrando
     setInterval(() => {
