@@ -211,6 +211,12 @@
         applyFilters();
       });
     });
+
+    // Auto-refresh cada 30 s, solo si el usuario no está filtrando
+    setInterval(() => {
+      const q = search ? search.value.trim() : '';
+      if (!q && activeCat === 'all') location.reload();
+    }, 30000);
   </script>
 </body>
 </html>

@@ -228,7 +228,10 @@
   </div>
 
   <script>
-    document.getElementById('msgs').scrollTop = 9999999;
+    const msgs = document.getElementById('msgs');
+    msgs.scrollTop = 9999999;
+    // Auto-refresh cada 15 s; vuelve al scroll inferior automáticamente
+    setInterval(() => location.reload(), 15000);
   </script>
 </body>
 </html>
