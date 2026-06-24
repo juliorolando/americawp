@@ -20,6 +20,14 @@ const SELECTORS = {
   msgText:       'span.selectable-text',
   msgOutClasses: ['message-out', 'msg-out'],
   deliveryCheck: '[data-testid="msg-dbl-check"], [data-testid="msg-check"], [data-testid="msg-time-read"]',
+
+  mediaTypes: [
+    { sel: '[data-testid="image-thumb"]',    label: '🖼️ Imagen'    },
+    { sel: '[data-testid="video-thumb"]',    label: '🎥 Video'     },
+    { sel: '[data-testid="audio-player"]',   label: '🎤 Audio'     },
+    { sel: '[data-testid="document-thumb"]', label: '📄 Documento' },
+    { sel: '[data-testid="sticker-kf"]',     label: '🎨 Sticker'   },
+  ],
 };
 
 const SESSION_DIR  = path.join(__dirname, 'whatsapp-session');
@@ -59,6 +67,7 @@ function buildObserverScript(selectors) {
   const msgNodeSel = ${JSON.stringify(selectors.msgNode)};
   const msgTextSel = ${JSON.stringify(selectors.msgText)};
   const titleSel   = ${JSON.stringify(selectors.chatTitle)};
+  const mediaTypes = ${JSON.stringify(selectors.mediaTypes)};
 
   // seen: data-ids ya procesados + los que estaban al abrir el chat (historia)
   const seen = new Set(
@@ -130,7 +139,14 @@ function buildObserverScript(selectors) {
   // Intenta extraer y guardar un mensaje. Devuelve true si lo procesó.
   function processNode(node, dataId) {
     const textEl = node.querySelector(msgTextSel);
-    const body   = textEl ? textEl.innerText.trim() : '';
+    let body = textEl ? textEl.innerText.trim() : '';
+
+    if (!body) {
+      for (const { sel, label } of mediaTypes) {
+        if (node.querySelector(sel)) { body = label; break; }
+      }
+    }
+
     if (!body) return false;
 
     seen.add(dataId);

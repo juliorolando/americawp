@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Estadísticas — WasapPanel</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #111; min-height: 100vh; }
+
+    header { background: #128C7E; color: #fff; padding: 12px 18px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 20; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+    .logo { font-size: 1.1rem; font-weight: 700; letter-spacing: -.3px; }
+    .logo span { color: #a5d6a7; }
+    header .spacer { flex: 1; }
+    header form button { background: rgba(255,255,255,.15); border: none; color: #fff; font-size: .78rem; padding: 5px 12px; border-radius: 6px; cursor: pointer; }
+    header form button:hover { background: rgba(255,255,255,.25); }
+
+    nav { background: #0f7268; display: flex; overflow-x: auto; scrollbar-width: none; }
+    nav::-webkit-scrollbar { display: none; }
+    nav a { color: rgba(255,255,255,.7); text-decoration: none; padding: 10px 18px; font-size: .82rem; font-weight: 500; white-space: nowrap; border-bottom: 2px solid transparent; transition: color .15s; }
+    nav a:hover { color: #fff; }
+    nav a.active { color: #fff; border-bottom-color: #25D366; }
+
+    main { max-width: 700px; margin: 0 auto; padding: 20px 12px 40px; }
+
+    /* ── Summary cards ── */
+    .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 22px; }
+    .sum-card { background: #fff; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
+    .sum-label { font-size: .7rem; color: #999; text-transform: uppercase; letter-spacing: .4px; }
+    .sum-value { font-size: 1.7rem; font-weight: 700; margin-top: 4px; color: #128C7E; }
+
+    /* ── Sections ── */
+    .section { background: #fff; border-radius: 10px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,.07); margin-bottom: 14px; }
+    .section-title { font-size: .82rem; font-weight: 700; color: #444; margin-bottom: 16px; text-transform: uppercase; letter-spacing: .4px; }
+
+    /* ── Bar chart ── */
+    .chart-wrap { overflow-x: auto; }
+    .bar-chart { display: flex; align-items: flex-end; gap: 3px; height: 90px; min-width: max-content; }
+    .bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .bar { width: 18px; background: #25D366; border-radius: 2px 2px 0 0; min-height: 2px; transition: opacity .15s; }
+    .bar:hover { opacity: .75; }
+    .bar-val { font-size: .6rem; color: #bbb; text-align: center; }
+    .bar-lbl { font-size: .62rem; color: #aaa; text-align: center; white-space: nowrap; }
+
+    /* ── Day chart ── */
+    .day-chart { display: flex; align-items: flex-end; gap: 4px; height: 90px; }
+    .day-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+    .day-bar { width: 100%; background: #128C7E; border-radius: 2px 2px 0 0; min-height: 2px; }
+    .day-lbl { font-size: .55rem; color: #bbb; text-align: center; white-space: nowrap; overflow: hidden; }
+
+    .empty-chart { text-align: center; color: #ccc; padding: 30px 0; font-size: .88rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">Wasap<span>Panel</span></div>
+    <div class="spacer"></div>
+    <form method="POST" action="/logout"><button>Salir</button></form>
+  </header>
+  <nav>
+    <a href="/">Chats</a>
+    <a href="/pendientes">Pendientes</a>
+    <a href="/estadisticas" class="active">Estadísticas</a>
+    <a href="/buscar">Buscar</a>
+  </nav>
+
+  <main>
+    <%
+      const maxHour = Math.max(...data.byHour.map(h => h.count), 1);
+      const maxDay  = data.byDay.length ? Math.max(...data.byDay.map(d => d.count), 1) : 1;
+      const last14  = data.byDay.slice(-14);
+    %>
+
+    <div class="summary">
+      <div class="sum-card">
+        <div class="sum-label">Total mensajes</div>
+        <div class="sum-value"><%= data.total.toLocaleString('es-AR') %></div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Total contactos</div>
+        <div class="sum-value"><%= data.totalChats.toLocaleString('es-AR') %></div>
+      </div>
+    </div>
+
+    <!-- Actividad por hora -->
+    <div class="section">
+      <div class="section-title">Actividad por hora del día</div>
+      <% if (data.total === 0) { %>
+        <div class="empty-chart">Sin datos aún</div>
+      <% } else { %>
+        <div class="chart-wrap">
+          <div class="bar-chart">
+            <% data.byHour.forEach(function(h) {
+              const pct = Math.round(h.count / maxHour * 100);
+              const lbl = String(h.hour).padStart(2, '0');
+            %>
+              <div class="bar-col">
+                <div class="bar-val"><%= h.count > 0 ? h.count : '' %></div>
+                <div class="bar" style="height:<%= Math.max(pct, h.count > 0 ? 3 : 0) %>px;" title="<%= lbl %>h: <%= h.count %> msgs"></div>
+                <div class="bar-lbl"><%= h.hour % 3 === 0 ? lbl : '' %></div>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+        <%
+          const peakHour = data.byHour.reduce((a,b) => b.count > a.count ? b : a, data.byHour[0]);
+          const peakLbl  = String(peakHour.hour).padStart(2,'0') + ':00';
+        %>
+        <p style="font-size:.75rem;color:#888;margin-top:12px;">
+          Pico de actividad: <strong><%= peakLbl %> h</strong> con <strong><%= peakHour.count %></strong> mensajes
+        </p>
+      <% } %>
+    </div>
+
+    <!-- Mensajes por día (últimos 14 días) -->
+    <div class="section">
+      <div class="section-title">Mensajes por día (últimos 30 días)</div>
+      <% if (data.byDay.length === 0) { %>
+        <div class="empty-chart">Sin datos aún</div>
+      <% } else { %>
+        <div class="day-chart">
+          <% last14.forEach(function(d) {
+            const pct   = Math.round(d.count / maxDay * 100);
+            const parts = d.day.split('-');
+            const lbl   = parts[2] + '/' + parts[1];
+          %>
+            <div class="day-col">
+              <div class="day-bar" style="height:<%= Math.max(pct, 2) %>px;" title="<%= d.day %>: <%= d.count %> msgs"></div>
+              <div class="day-lbl"><%= lbl %></div>
+            </div>
+          <% }); %>
+        </div>
+        <%
+          const busyDay = data.byDay.reduce((a,b) => b.count > a.count ? b : a, data.byDay[0]);
+          const bdParts = busyDay.day.split('-');
+          const bdLbl   = bdParts[2] + '/' + bdParts[1] + '/' + bdParts[0];
+        %>
+        <p style="font-size:.75rem;color:#888;margin-top:12px;">
+          Día más activo: <strong><%= bdLbl %></strong> con <strong><%= busyDay.count %></strong> mensajes
+        </p>
+      <% } %>
+    </div>
+
+  </main>
+</body>
+</html>

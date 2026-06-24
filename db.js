@@ -51,7 +51,9 @@ const stmts = {
       c.phone_or_name,
       c.last_seen,
       COUNT(m.id) AS message_count,
-      (SELECT body FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_message
+      (SELECT body      FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_message,
+      (SELECT direction FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_direction,
+      (SELECT GROUP_CONCAT(body, ' ') FROM (SELECT body FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 30)) AS sample_text
     FROM chats c
     LEFT JOIN messages m ON m.chat_id = c.id
     GROUP BY c.id
@@ -92,8 +94,102 @@ function saveMessage({ chatId, direction, body, timestamp, waId }) {
   return info.lastInsertRowid;
 }
 
+function saveMessagesBatch(msgs) {
+  let saved = 0;
+  db.exec('BEGIN');
+  try {
+    for (const { chatName, direction, body, timestamp, waId } of msgs) {
+      if (!chatName || !direction || !body) continue;
+      const chatId = upsertChat(chatName);
+      const id     = saveMessage({ chatId, direction, body, timestamp: timestamp || Date.now(), waId });
+      if (id !== null) saved++;
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+  return saved;
+}
+
 function getChats()          { return stmts.listChats.all(); }
 function getMessages(chatId) { return stmts.getMsgs.all(chatId); }
 function getChat(chatId)     { return stmts.getChat.get(chatId); }
 
-module.exports = { db, upsertChat, saveMessage, getChats, getMessages, getChat };
+function getPendingChats() {
+  return db.prepare(`
+    SELECT
+      c.id,
+      c.phone_or_name,
+      c.last_seen,
+      COUNT(m.id) AS message_count,
+      (SELECT body      FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_message,
+      (SELECT timestamp FROM messages WHERE chat_id = c.id AND direction = 'in' ORDER BY timestamp DESC LIMIT 1) AS waiting_since
+    FROM chats c
+    JOIN messages m ON m.chat_id = c.id
+    WHERE (SELECT direction FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) = 'in'
+    GROUP BY c.id
+    ORDER BY c.last_seen ASC
+  `).all();
+}
+
+function searchMessages(q) {
+  return db.prepare(`
+    SELECT m.id, m.body, m.direction, m.timestamp, m.chat_id, c.phone_or_name
+    FROM messages m
+    JOIN chats c ON c.id = m.chat_id
+    WHERE m.body LIKE ?
+    ORDER BY m.timestamp DESC
+    LIMIT 150
+  `).all(`%${q}%`);
+}
+
+function getActivityStats() {
+  const byHourRaw = db.prepare(`
+    SELECT
+      CAST(strftime('%H', datetime(timestamp/1000, 'unixepoch', 'localtime')) AS INTEGER) AS hour,
+      COUNT(*) AS count
+    FROM messages
+    GROUP BY hour
+    ORDER BY hour
+  `).all();
+
+  const byHour = Array.from({ length: 24 }, (_, h) => ({
+    hour: h,
+    count: (byHourRaw.find(r => r.hour === h) || { count: 0 }).count,
+  }));
+
+  const since30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const byDay = db.prepare(`
+    SELECT
+      date(datetime(timestamp/1000, 'unixepoch', 'localtime')) AS day,
+      COUNT(*) AS count
+    FROM messages
+    WHERE timestamp >= ?
+    GROUP BY day
+    ORDER BY day
+  `).all(since30);
+
+  const total      = db.prepare('SELECT COUNT(*) AS n FROM messages').get().n;
+  const totalChats = db.prepare('SELECT COUNT(*) AS n FROM chats').get().n;
+
+  return { byHour, byDay, total, totalChats };
+}
+
+function getStats() {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const ts = todayStart.getTime();
+
+  const msgsToday      = db.prepare('SELECT COUNT(*) AS n FROM messages WHERE timestamp >= ?').get(ts).n;
+  const chatsToday     = db.prepare('SELECT COUNT(*) AS n FROM chats WHERE last_seen >= ?').get(ts).n;
+  const sinRespuesta   = db.prepare(`
+    SELECT COUNT(*) AS n FROM chats
+    WHERE last_seen >= ?
+      AND (SELECT direction FROM messages WHERE chat_id = chats.id ORDER BY timestamp DESC LIMIT 1) = 'in'
+  `).get(ts).n;
+
+  return { msgsToday, chatsToday, sinRespuesta };
+}
+
+module.exports = { db, upsertChat, saveMessage, saveMessagesBatch, getChats, getMessages, getChat, getStats, getPendingChats, searchMessages, getActivityStats };

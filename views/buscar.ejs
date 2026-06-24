@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Buscar — WasapPanel</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #111; min-height: 100vh; }
+
+    header { background: #128C7E; color: #fff; padding: 12px 18px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 20; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+    .logo { font-size: 1.1rem; font-weight: 700; letter-spacing: -.3px; }
+    .logo span { color: #a5d6a7; }
+    header .spacer { flex: 1; }
+    header form button { background: rgba(255,255,255,.15); border: none; color: #fff; font-size: .78rem; padding: 5px 12px; border-radius: 6px; cursor: pointer; }
+    header form button:hover { background: rgba(255,255,255,.25); }
+
+    nav { background: #0f7268; display: flex; overflow-x: auto; scrollbar-width: none; }
+    nav::-webkit-scrollbar { display: none; }
+    nav a { color: rgba(255,255,255,.7); text-decoration: none; padding: 10px 18px; font-size: .82rem; font-weight: 500; white-space: nowrap; border-bottom: 2px solid transparent; transition: color .15s; }
+    nav a:hover { color: #fff; }
+    nav a.active { color: #fff; border-bottom-color: #25D366; }
+
+    main { max-width: 700px; margin: 0 auto; padding: 20px 12px 40px; }
+
+    /* ── Search form ── */
+    .search-form { display: flex; gap: 8px; margin-bottom: 20px; }
+    .search-form input {
+      flex: 1; padding: 10px 14px; border: 1.5px solid #e0e0e0; border-radius: 8px;
+      font-size: .92rem; outline: none; background: #fff; transition: border-color .15s;
+    }
+    .search-form input:focus { border-color: #25D366; }
+    .search-form button {
+      padding: 10px 18px; background: #128C7E; color: #fff; border: none;
+      border-radius: 8px; font-size: .88rem; font-weight: 600; cursor: pointer;
+    }
+    .search-form button:hover { background: #0f7268; }
+
+    /* ── Results ── */
+    .results-label { font-size: .75rem; color: #999; margin-bottom: 12px; }
+
+    .chat-group { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.07); margin-bottom: 10px; overflow: hidden; }
+    .group-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 14px; background: #f7f7f7; border-bottom: 1px solid #eee;
+      text-decoration: none; color: inherit;
+    }
+    .group-header:hover { background: #f0f0f0; }
+    .g-avatar { width: 32px; height: 32px; border-radius: 50%; background: #128C7E; color: #fff; display: flex; align-items: center; justify-content: center; font-size: .85rem; font-weight: 700; flex-shrink: 0; }
+    .g-name { font-weight: 600; font-size: .88rem; flex: 1; }
+    .g-count { font-size: .72rem; color: #999; }
+
+    .msg-result { padding: 9px 14px; border-bottom: 1px solid #f3f3f3; display: flex; gap: 10px; align-items: flex-start; }
+    .msg-result:last-child { border-bottom: none; }
+    .msg-dir { font-size: .65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; margin-top: 1px; }
+    .msg-dir.in  { background: #e3f2fd; color: #1565c0; }
+    .msg-dir.out { background: #e8f5e9; color: #2e7d32; }
+    .msg-body { font-size: .83rem; color: #333; line-height: 1.4; flex: 1; word-break: break-word; }
+    .msg-body mark { background: #fff59d; border-radius: 2px; padding: 0 1px; }
+    .msg-time { font-size: .68rem; color: #bbb; flex-shrink: 0; margin-top: 2px; }
+
+    .empty { text-align: center; color: #bbb; margin-top: 50px; font-size: .92rem; line-height: 1.7; }
+    .hint  { text-align: center; color: #ccc; margin-top: 50px; font-size: .88rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">Wasap<span>Panel</span></div>
+    <div class="spacer"></div>
+    <form method="POST" action="/logout"><button>Salir</button></form>
+  </header>
+  <nav>
+    <a href="/">Chats</a>
+    <a href="/pendientes">Pendientes</a>
+    <a href="/estadisticas">Estadísticas</a>
+    <a href="/buscar" class="active">Buscar</a>
+  </nav>
+
+  <main>
+    <form class="search-form" method="GET" action="/buscar">
+      <input type="text" name="q" value="<%= q %>" placeholder="Buscar en el contenido de los mensajes…" autocomplete="off" autofocus>
+      <button type="submit">Buscar</button>
+    </form>
+
+    <% if (!q) { %>
+      <p class="hint">Ingresá una palabra o frase para buscar en todas las conversaciones.</p>
+    <% } else if (grouped.length === 0) { %>
+      <p class="empty">No se encontraron mensajes con "<%= q %>".</p>
+    <% } else { %>
+      <p class="results-label"><%= results.length %> resultado<%= results.length !== 1 ? 's' : '' %> en <%= grouped.length %> chat<%= grouped.length !== 1 ? 's' : '' %></p>
+
+      <% grouped.forEach(function(group) {
+        const initial = (group.name || '?')[0].toUpperCase();
+      %>
+        <div class="chat-group">
+          <a class="group-header" href="/chat/<%= group.chat_id %>">
+            <div class="g-avatar"><%= initial %></div>
+            <div class="g-name"><%= group.name %></div>
+            <div class="g-count"><%= group.msgs.length %> resultado<%= group.msgs.length !== 1 ? 's' : '' %> →</div>
+          </a>
+          <% group.msgs.slice(0, 5).forEach(function(msg) {
+            const d = new Date(msg.timestamp);
+            const timeStr = d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })
+              + ' ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+          %>
+            <div class="msg-result">
+              <span class="msg-dir <%= msg.direction %>"><%= msg.direction === 'in' ? 'Cliente' : 'Recepción' %></span>
+              <div class="msg-body"><%- highlight(msg.body, q) %></div>
+              <div class="msg-time"><%= timeStr %></div>
+            </div>
+          <% }); %>
+          <% if (group.msgs.length > 5) { %>
+            <div style="padding:8px 14px;font-size:.75rem;color:#999;border-top:1px solid #f3f3f3;">
+              + <%= group.msgs.length - 5 %> resultado<%= group.msgs.length - 5 !== 1 ? 's' : '' %> más en este chat
+            </div>
+          <% } %>
+        </div>
+      <% }); %>
+    <% } %>
+  </main>
+</body>
+</html>

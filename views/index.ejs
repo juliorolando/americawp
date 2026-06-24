@@ -3,122 +3,166 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>WasapPanel — Recepción</title>
+  <title>WasapPanel</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #111; min-height: 100vh; }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f0f2f5;
-      color: #111;
-      min-height: 100vh;
-    }
+    /* ── Header ── */
+    header { background: #128C7E; color: #fff; padding: 12px 18px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 20; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+    .logo { font-size: 1.1rem; font-weight: 700; letter-spacing: -.3px; }
+    .logo span { color: #a5d6a7; }
+    header .spacer { flex: 1; }
+    header form button { background: rgba(255,255,255,.15); border: none; color: #fff; font-size: .78rem; padding: 5px 12px; border-radius: 6px; cursor: pointer; }
+    header form button:hover { background: rgba(255,255,255,.25); }
 
-    header {
-      background: #25D366;
-      color: #fff;
-      padding: 14px 20px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      box-shadow: 0 1px 3px rgba(0,0,0,.15);
-    }
-    header h1 { font-size: 1.15rem; font-weight: 600; }
-    header span { font-size: .85rem; opacity: .85; margin-left: auto; }
+    /* ── Nav ── */
+    nav { background: #0f7268; display: flex; overflow-x: auto; scrollbar-width: none; }
+    nav::-webkit-scrollbar { display: none; }
+    nav a { color: rgba(255,255,255,.7); text-decoration: none; padding: 10px 18px; font-size: .82rem; font-weight: 500; white-space: nowrap; border-bottom: 2px solid transparent; transition: color .15s, border-color .15s; }
+    nav a:hover { color: #fff; }
+    nav a.active { color: #fff; border-bottom-color: #25D366; }
 
-    main { max-width: 680px; margin: 0 auto; padding: 16px 12px; }
+    /* ── Layout ── */
+    main { max-width: 700px; margin: 0 auto; padding: 18px 12px 40px; }
 
-    .chat-list { display: flex; flex-direction: column; gap: 8px; }
+    /* ── Stats ── */
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-bottom: 18px; }
+    .stat-card { background: #fff; border-radius: 10px; padding: 13px 15px; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
+    .stat-label { font-size: .68rem; color: #999; text-transform: uppercase; letter-spacing: .4px; }
+    .stat-value { font-size: 1.55rem; font-weight: 700; margin-top: 3px; }
+    .stat-card.alert .stat-value { color: #e53935; }
 
-    .chat-card {
-      background: #fff;
-      border-radius: 10px;
-      padding: 14px 16px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      text-decoration: none;
-      color: inherit;
-      box-shadow: 0 1px 2px rgba(0,0,0,.08);
-      transition: box-shadow .15s;
-    }
-    .chat-card:hover { box-shadow: 0 3px 8px rgba(0,0,0,.12); }
+    /* ── Search ── */
+    .search-wrap { position: relative; margin-bottom: 12px; }
+    .search-wrap svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: #bbb; pointer-events: none; }
+    #search { width: 100%; padding: 9px 12px 9px 36px; border: 1.5px solid #e0e0e0; border-radius: 8px; font-size: .88rem; background: #fff; outline: none; transition: border-color .15s; }
+    #search:focus { border-color: #25D366; }
 
-    .avatar {
-      width: 46px;
-      height: 46px;
-      border-radius: 50%;
-      background: #25D366;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.2rem;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
+    /* ── Category filter ── */
+    .cat-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+    .cat-btn { border: none; border-radius: 20px; padding: 4px 12px; font-size: .75rem; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+    .cat-btn:not(.active) { opacity: .45; }
+    .cat-btn.active { opacity: 1; }
 
+    /* ── Section label ── */
+    .section-label { font-size: .72rem; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+
+    /* ── Chat list ── */
+    .chat-list { display: flex; flex-direction: column; gap: 6px; }
+    .chat-card { background: #fff; border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; box-shadow: 0 1px 2px rgba(0,0,0,.07); transition: box-shadow .15s, transform .1s; border-left: 3px solid transparent; }
+    .chat-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,.11); transform: translateY(-1px); }
+    .chat-card.sin-resp { border-left-color: #e53935; }
+    .avatar { width: 43px; height: 43px; border-radius: 50%; background: #128C7E; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; font-weight: 700; flex-shrink: 0; }
     .chat-info { flex: 1; min-width: 0; }
-    .chat-name { font-weight: 600; font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .chat-preview {
-      font-size: .82rem;
-      color: #667;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      margin-top: 3px;
-    }
-
+    .chat-name-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+    .chat-name { font-weight: 600; font-size: .92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .badge { font-size: .62rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
+    .badge-hoy  { background: #e8f5e9; color: #2e7d32; }
+    .badge-sinr { background: #ffebee; color: #c62828; }
+    .cat-badge  { font-size: .62rem; font-weight: 700; padding: 2px 7px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
+    .chat-preview { font-size: .8rem; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; }
+    .chat-preview.out::before { content: '✓ '; color: #25D366; }
     .chat-meta { text-align: right; flex-shrink: 0; }
-    .chat-time { font-size: .75rem; color: #999; }
-    .chat-count {
-      display: inline-block;
-      margin-top: 4px;
-      background: #25D366;
-      color: #fff;
-      border-radius: 10px;
-      font-size: .72rem;
-      padding: 1px 7px;
-    }
+    .chat-time { font-size: .72rem; color: #bbb; }
+    .chat-count { display: inline-block; margin-top: 5px; background: #25D366; color: #fff; border-radius: 10px; font-size: .68rem; padding: 1px 8px; font-weight: 600; }
 
-    .empty { text-align: center; color: #999; margin-top: 60px; font-size: .95rem; }
+    .empty { text-align: center; color: #bbb; margin-top: 50px; font-size: .92rem; line-height: 1.7; }
+    #no-results { display: none; text-align: center; color: #bbb; padding: 28px 0; font-size: .88rem; }
 
     @media (max-width: 480px) {
-      .chat-card { padding: 12px; }
-      .avatar { width: 40px; height: 40px; font-size: 1rem; }
+      .stats { gap: 7px; }
+      .stat-value { font-size: 1.3rem; }
+      .chat-card { padding: 11px 12px; }
+      .avatar { width: 38px; height: 38px; }
     }
   </style>
 </head>
 <body>
   <header>
-    <h1>WasapPanel</h1>
-    <span><%= chats.length %> chat<%= chats.length !== 1 ? 's' : '' %></span>
+    <div class="logo">Wasap<span>Panel</span></div>
+    <div class="spacer"></div>
+    <form method="POST" action="/logout"><button type="submit">Salir</button></form>
   </header>
+  <nav>
+    <a href="/" class="active">Chats</a>
+    <a href="/pendientes">Pendientes <% if(stats.sinRespuesta > 0){ %><span style="background:#e53935;color:#fff;border-radius:10px;padding:1px 6px;font-size:.65rem;margin-left:2px;"><%= stats.sinRespuesta %></span><% } %></a>
+    <a href="/estadisticas">Estadísticas</a>
+    <a href="/buscar">Buscar</a>
+  </nav>
 
   <main>
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-label">Mensajes hoy</div>
+        <div class="stat-value"><%= stats.msgsToday %></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Chats activos hoy</div>
+        <div class="stat-value"><%= stats.chatsToday %></div>
+      </div>
+      <div class="stat-card <%= stats.sinRespuesta > 0 ? 'alert' : '' %>">
+        <div class="stat-label">Sin respuesta</div>
+        <div class="stat-value"><%= stats.sinRespuesta %></div>
+      </div>
+    </div>
+
     <% if (chats.length === 0) { %>
-      <p class="empty">Ningún chat registrado todavía.<br>Iniciá el monitor y abrí un chat en WhatsApp Web.</p>
+      <p class="empty">Ningún chat registrado todavía.<br>Instalá la extensión y abrí un chat en WhatsApp Web.</p>
     <% } else { %>
-      <div class="chat-list">
+
+      <div class="search-wrap">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="search" placeholder="Filtrar por nombre o número…" autocomplete="off">
+      </div>
+
+      <%
+        const cats = [...new Set(chats.map(c => c.category.label))].sort();
+      %>
+      <div class="cat-filters" id="cat-filters">
+        <button class="cat-btn active" data-cat="all" style="background:#e0e0e0;color:#444;">Todos</button>
+        <% cats.forEach(cat => {
+          const c = chats.find(ch => ch.category.label === cat).category;
+        %>
+          <button class="cat-btn" data-cat="<%= cat %>"
+            style="background:<%= c.bg %>;color:<%= c.color %>;">
+            <%= cat %>
+          </button>
+        <% }) %>
+      </div>
+
+      <div class="section-label" id="section-label"><%= chats.length %> conversacion<%= chats.length !== 1 ? 'es' : '' %></div>
+
+      <div class="chat-list" id="chat-list">
         <% chats.forEach(function(chat) {
           const initial = (chat.phone_or_name || '?')[0].toUpperCase();
-          const d = new Date(chat.last_seen);
-          const today = new Date();
+          const d       = new Date(chat.last_seen);
+          const today   = new Date();
+          const isToday = d.toDateString() === today.toDateString();
+          const sinResp = chat.last_direction === 'in';
           let timeLabel;
-          if (d.toDateString() === today.toDateString()) {
+          if (isToday) {
             timeLabel = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
           } else {
-            timeLabel = d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+            const yest = new Date(today); yest.setDate(today.getDate() - 1);
+            timeLabel = d.toDateString() === yest.toDateString()
+              ? 'Ayer'
+              : d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
           }
         %>
-          <a class="chat-card" href="/chat/<%= chat.id %>">
+          <a class="chat-card <%= sinResp && isToday ? 'sin-resp' : '' %>"
+             href="/chat/<%= chat.id %>"
+             data-name="<%= chat.phone_or_name.toLowerCase() %>"
+             data-cat="<%= chat.category.label %>">
             <div class="avatar"><%= initial %></div>
             <div class="chat-info">
-              <div class="chat-name"><%= chat.phone_or_name %></div>
-              <div class="chat-preview"><%= chat.last_message || '—' %></div>
+              <div class="chat-name-row">
+                <div class="chat-name"><%= chat.phone_or_name %></div>
+                <span class="cat-badge" style="background:<%= chat.category.bg %>;color:<%= chat.category.color %>;"><%= chat.category.label %></span>
+                <% if (isToday)  { %><span class="badge badge-hoy">HOY</span><% } %>
+                <% if (sinResp && isToday) { %><span class="badge badge-sinr">SIN RESP</span><% } %>
+              </div>
+              <div class="chat-preview <%= chat.last_direction === 'out' ? 'out' : '' %>"><%= chat.last_message || '—' %></div>
             </div>
             <div class="chat-meta">
               <div class="chat-time"><%= timeLabel %></div>
@@ -127,7 +171,46 @@
           </a>
         <% }); %>
       </div>
+      <div id="no-results">No se encontraron chats.</div>
+
     <% } %>
   </main>
+
+  <script>
+    // Filtro por nombre (cliente)
+    const search   = document.getElementById('search');
+    const list     = document.getElementById('chat-list');
+    const noRes    = document.getElementById('no-results');
+    const secLabel = document.getElementById('section-label');
+    let activeCat  = 'all';
+
+    function applyFilters() {
+      if (!list) return;
+      const q     = (search ? search.value.toLowerCase().trim() : '');
+      const cards = list.querySelectorAll('.chat-card');
+      let vis     = 0;
+      cards.forEach(card => {
+        const nameOk = !q || card.dataset.name.includes(q);
+        const catOk  = activeCat === 'all' || card.dataset.cat === activeCat;
+        const show   = nameOk && catOk;
+        card.style.display = show ? '' : 'none';
+        if (show) vis++;
+      });
+      if (noRes) noRes.style.display = vis === 0 ? 'block' : 'none';
+      if (secLabel) secLabel.textContent = vis + ' conversacion' + (vis !== 1 ? 'es' : '');
+    }
+
+    if (search) search.addEventListener('input', applyFilters);
+
+    // Filtro por categoría
+    document.querySelectorAll('.cat-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeCat = btn.dataset.cat;
+        applyFilters();
+      });
+    });
+  </script>
 </body>
 </html>
