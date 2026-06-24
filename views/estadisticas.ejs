@@ -49,6 +49,29 @@
     .day-lbl { font-size: .55rem; color: #bbb; text-align: center; white-space: nowrap; overflow: hidden; }
 
     .empty-chart { text-align: center; color: #ccc; padding: 30px 0; font-size: .88rem; }
+
+    /* ── Date filter ── */
+    .date-filter { margin-bottom: 20px; }
+    .preset-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .preset-btn {
+      padding: 5px 14px; border-radius: 20px; border: 1.5px solid #e0e0e0;
+      background: #fff; font-size: .78rem; font-weight: 600; color: #888;
+      text-decoration: none; transition: all .15s;
+    }
+    .preset-btn:hover { border-color: #128C7E; color: #128C7E; }
+    .preset-btn.active { border-color: #128C7E; background: #128C7E; color: #fff; }
+    .custom-range { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .custom-range input[type="date"] {
+      padding: 6px 10px; border: 1.5px solid #e0e0e0; border-radius: 8px;
+      font-size: .82rem; outline: none; background: #fff; color: #444;
+    }
+    .custom-range input[type="date"]:focus { border-color: #128C7E; }
+    .custom-range button {
+      padding: 6px 16px; background: #128C7E; color: #fff; border: none;
+      border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer;
+    }
+    .custom-range button:hover { background: #0f7268; }
+    .custom-sep { color: #bbb; font-size: .85rem; }
   </style>
 </head>
 <body>
@@ -66,6 +89,21 @@
   </nav>
 
   <main>
+    <div class="date-filter">
+      <div class="preset-btns">
+        <a href="/estadisticas?preset=semana"    class="preset-btn <%= preset === 'semana'    ? 'active' : '' %>">Esta semana</a>
+        <a href="/estadisticas?preset=mes"       class="preset-btn <%= preset === 'mes'       ? 'active' : '' %>">30 días</a>
+        <a href="/estadisticas?preset=trimestre" class="preset-btn <%= preset === 'trimestre' ? 'active' : '' %>">90 días</a>
+        <a href="/estadisticas"                  class="preset-btn <%= !preset && !from       ? 'active' : '' %>">Todo</a>
+      </div>
+      <form class="custom-range" method="GET" action="/estadisticas">
+        <input type="date" name="from" value="<%= from %>">
+        <span class="custom-sep">→</span>
+        <input type="date" name="to"   value="<%= to %>">
+        <button type="submit">Filtrar</button>
+      </form>
+    </div>
+
     <%
       const maxHour = Math.max(...data.byHour.map(h => h.count), 1);
       const maxDay  = data.byDay.length ? Math.max(...data.byDay.map(d => d.count), 1) : 1;

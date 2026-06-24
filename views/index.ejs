@@ -39,12 +39,6 @@
     #search { width: 100%; padding: 9px 12px 9px 36px; border: 1.5px solid #e0e0e0; border-radius: 8px; font-size: .88rem; background: #fff; outline: none; transition: border-color .15s; }
     #search:focus { border-color: #25D366; }
 
-    /* ── Category filter ── */
-    .cat-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
-    .cat-btn { border: none; border-radius: 20px; padding: 4px 12px; font-size: .75rem; font-weight: 600; cursor: pointer; transition: opacity .15s; }
-    .cat-btn:not(.active) { opacity: .45; }
-    .cat-btn.active { opacity: 1; }
-
     /* ── Section label ── */
     .section-label { font-size: .72rem; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
 
@@ -68,9 +62,10 @@
     .chat-name-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
     .chat-name { font-weight: 600; font-size: .92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .badge { font-size: .62rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
-    .badge-hoy  { background: #e8f5e9; color: #2e7d32; }
-    .badge-sinr { background: #ffebee; color: #c62828; }
-    .cat-badge  { font-size: .62rem; font-weight: 700; padding: 2px 7px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
+    .badge-hoy      { background: #e8f5e9; color: #2e7d32; }
+    .badge-sinr     { background: #ffebee; color: #c62828; }
+    .badge-proceso  { background: #fff3e0; color: #e65100; }
+    .badge-resuelto { background: #e8f5e9; color: #1b5e20; }
     .chat-preview { font-size: .8rem; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; }
     .chat-preview.out::before { content: '✓ '; color: #25D366; }
     .chat-meta { text-align: right; flex-shrink: 0; }
@@ -127,22 +122,7 @@
         <input type="text" id="search" placeholder="Filtrar por nombre o número…" autocomplete="off">
       </div>
 
-      <%
-        const cats = [...new Set(chats.map(c => c.category.label))].sort();
-      %>
-      <div class="cat-filters" id="cat-filters">
-        <button class="cat-btn active" data-cat="all" style="background:#e0e0e0;color:#444;">Todos</button>
-        <% cats.forEach(cat => {
-          const c = chats.find(ch => ch.category.label === cat).category;
-        %>
-          <button class="cat-btn" data-cat="<%= cat %>"
-            style="background:<%= c.bg %>;color:<%= c.color %>;">
-            <%= cat %>
-          </button>
-        <% }) %>
-      </div>
-
-      <div class="section-label" id="section-label"><%= chats.length %> conversacion<%= chats.length !== 1 ? 'es' : '' %></div>
+<div class="section-label" id="section-label"><%= chats.length %> conversacion<%= chats.length !== 1 ? 'es' : '' %></div>
 
       <div class="chat-list" id="chat-list">
         <% chats.forEach(function(chat) {
@@ -162,17 +142,17 @@
           }
         %>
           <div class="chat-card-wrap"
-               data-name="<%= chat.phone_or_name.toLowerCase() %>"
-               data-cat="<%= chat.category.label %>">
+               data-name="<%= chat.phone_or_name.toLowerCase() %>">
             <a class="chat-card <%= sinResp && isToday ? 'sin-resp' : '' %>"
                href="/chat/<%= chat.id %>">
               <div class="avatar"><%= initial %></div>
               <div class="chat-info">
                 <div class="chat-name-row">
                   <div class="chat-name"><%= chat.phone_or_name %></div>
-                  <span class="cat-badge" style="background:<%= chat.category.bg %>;color:<%= chat.category.color %>;"><%= chat.category.label %></span>
                   <% if (isToday)  { %><span class="badge badge-hoy">HOY</span><% } %>
                   <% if (sinResp && isToday) { %><span class="badge badge-sinr">SIN RESP</span><% } %>
+                  <% if (chat.status === 'en_proceso') { %><span class="badge badge-proceso">En proceso</span><% } %>
+                  <% if (chat.status === 'resuelto')   { %><span class="badge badge-resuelto">✓ Resuelto</span><% } %>
                 </div>
                 <div class="chat-preview <%= chat.last_direction === 'out' ? 'out' : '' %>"><%= chat.last_message || '—' %></div>
               </div>
@@ -196,7 +176,6 @@
     const list     = document.getElementById('chat-list');
     const noRes    = document.getElementById('no-results');
     const secLabel = document.getElementById('section-label');
-    let activeCat  = 'all';
 
     function applyFilters() {
       if (!list) return;
@@ -204,9 +183,7 @@
       const cards = list.querySelectorAll('.chat-card-wrap');
       let vis     = 0;
       cards.forEach(card => {
-        const nameOk = !q || card.dataset.name.includes(q);
-        const catOk  = activeCat === 'all' || card.dataset.cat === activeCat;
-        const show   = nameOk && catOk;
+        const show = !q || card.dataset.name.includes(q);
         card.style.display = show ? '' : 'none';
         if (show) vis++;
       });
@@ -215,16 +192,6 @@
     }
 
     if (search) search.addEventListener('input', applyFilters);
-
-    // Filtro por categoría
-    document.querySelectorAll('.cat-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        activeCat = btn.dataset.cat;
-        applyFilters();
-      });
-    });
 
     function ocultarChat(e, btn) {
       e.stopPropagation();
@@ -243,8 +210,7 @@
 
     // Auto-refresh cada 30 s, solo si el usuario no está filtrando
     setInterval(() => {
-      const q = search ? search.value.trim() : '';
-      if (!q && activeCat === 'all') location.reload();
+      if (!search || !search.value.trim()) location.reload();
     }, 30000);
   </script>
 </body>

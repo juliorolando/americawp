@@ -44,6 +44,12 @@ try {
   if (!chatCols.find(c => c.name === 'hidden')) {
     db.exec('ALTER TABLE chats ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
   }
+  if (!chatCols.find(c => c.name === 'status')) {
+    db.exec("ALTER TABLE chats ADD COLUMN status TEXT NOT NULL DEFAULT 'pendiente'");
+  }
+  if (!chatCols.find(c => c.name === 'notes')) {
+    db.exec("ALTER TABLE chats ADD COLUMN notes TEXT NOT NULL DEFAULT ''");
+  }
 } catch (_) {}
 
 const stmts = {
@@ -58,6 +64,7 @@ const stmts = {
       c.id,
       c.phone_or_name,
       c.last_seen,
+      c.status,
       COUNT(m.id) AS message_count,
       (SELECT body      FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_message,
       (SELECT direction FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_direction,
@@ -154,15 +161,12 @@ function searchMessages(q) {
   `).all(`%${q}%`);
 }
 
-function getActivityStats() {
-  const byHourRaw = db.prepare(`
-    SELECT
-      CAST(strftime('%H', datetime(timestamp/1000, 'unixepoch', 'localtime')) AS INTEGER) AS hour,
-      COUNT(*) AS count
-    FROM messages
-    GROUP BY hour
-    ORDER BY hour
-  `).all();
+function getActivityStats({ from = null, to = null } = {}) {
+  const hasRange = from !== null && to !== null;
+
+  const byHourRaw = hasRange
+    ? db.prepare(`SELECT CAST(strftime('%H', datetime(timestamp/1000, 'unixepoch', 'localtime')) AS INTEGER) AS hour, COUNT(*) AS count FROM messages WHERE timestamp >= ? AND timestamp <= ? GROUP BY hour ORDER BY hour`).all(from, to)
+    : db.prepare(`SELECT CAST(strftime('%H', datetime(timestamp/1000, 'unixepoch', 'localtime')) AS INTEGER) AS hour, COUNT(*) AS count FROM messages GROUP BY hour ORDER BY hour`).all();
 
   const byHour = Array.from({ length: 24 }, (_, h) => ({
     hour: h,
@@ -170,18 +174,17 @@ function getActivityStats() {
   }));
 
   const since30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  const byDay = db.prepare(`
-    SELECT
-      date(datetime(timestamp/1000, 'unixepoch', 'localtime')) AS day,
-      COUNT(*) AS count
-    FROM messages
-    WHERE timestamp >= ?
-    GROUP BY day
-    ORDER BY day
-  `).all(since30);
+  const byDay = hasRange
+    ? db.prepare(`SELECT date(datetime(timestamp/1000, 'unixepoch', 'localtime')) AS day, COUNT(*) AS count FROM messages WHERE timestamp >= ? AND timestamp <= ? GROUP BY day ORDER BY day`).all(from, to)
+    : db.prepare(`SELECT date(datetime(timestamp/1000, 'unixepoch', 'localtime')) AS day, COUNT(*) AS count FROM messages WHERE timestamp >= ? GROUP BY day ORDER BY day`).all(since30);
 
-  const total      = db.prepare('SELECT COUNT(*) AS n FROM messages').get().n;
-  const totalChats = db.prepare('SELECT COUNT(*) AS n FROM chats').get().n;
+  const total = hasRange
+    ? db.prepare('SELECT COUNT(*) AS n FROM messages WHERE timestamp >= ? AND timestamp <= ?').get(from, to).n
+    : db.prepare('SELECT COUNT(*) AS n FROM messages').get().n;
+
+  const totalChats = hasRange
+    ? db.prepare('SELECT COUNT(DISTINCT chat_id) AS n FROM messages WHERE timestamp >= ? AND timestamp <= ?').get(from, to).n
+    : db.prepare('SELECT COUNT(*) AS n FROM chats WHERE hidden = 0').get().n;
 
   return { byHour, byDay, total, totalChats };
 }
@@ -202,8 +205,10 @@ function getStats() {
   return { msgsToday, chatsToday, sinRespuesta };
 }
 
-function hideChat(id)   { db.prepare('UPDATE chats SET hidden = 1 WHERE id = ?').run(id); }
-function unhideChat(id) { db.prepare('UPDATE chats SET hidden = 0 WHERE id = ?').run(id); }
+function hideChat(id)     { db.prepare('UPDATE chats SET hidden = 1 WHERE id = ?').run(id); }
+function unhideChat(id)   { db.prepare('UPDATE chats SET hidden = 0 WHERE id = ?').run(id); }
+function setStatus(id, status) { db.prepare('UPDATE chats SET status = ? WHERE id = ?').run(status, id); }
+function setNotes(id, notes)   { db.prepare('UPDATE chats SET notes = ? WHERE id = ?').run(notes, id); }
 
 function getHiddenChats() {
   return db.prepare(`
@@ -221,4 +226,4 @@ function getHiddenChats() {
   `).all();
 }
 
-module.exports = { db, upsertChat, saveMessage, saveMessagesBatch, getChats, getMessages, getChat, getStats, getPendingChats, searchMessages, getActivityStats, hideChat, unhideChat, getHiddenChats };
+module.exports = { db, upsertChat, saveMessage, saveMessagesBatch, getChats, getMessages, getChat, getStats, getPendingChats, searchMessages, getActivityStats, hideChat, unhideChat, getHiddenChats, setStatus, setNotes };

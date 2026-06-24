@@ -5,7 +5,8 @@ const session = require('express-session');
 const path    = require('path');
 const { getChats, getChat, getMessages, upsertChat, saveMessage, saveMessagesBatch,
         getStats, getPendingChats, searchMessages, getActivityStats,
-        hideChat, unhideChat, getHiddenChats } = require('./db');
+        hideChat, unhideChat, getHiddenChats,
+        setStatus, setNotes } = require('./db');
 
 function categorize(text) {
   const t = (text || '').toLowerCase();
@@ -140,6 +141,20 @@ app.post('/chat/:id/hide', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/chat/:id/status', requireAuth, (req, res) => {
+  const { status } = req.body;
+  if (!['pendiente', 'en_proceso', 'resuelto'].includes(status)) {
+    return res.status(400).json({ ok: false });
+  }
+  setStatus(req.params.id, status);
+  res.json({ ok: true });
+});
+
+app.post('/chat/:id/notes', requireAuth, (req, res) => {
+  setNotes(req.params.id, req.body.notes || '');
+  res.json({ ok: true });
+});
+
 app.post('/chat/:id/show', requireAuth, (req, res) => {
   unhideChat(req.params.id);
   res.redirect('/ocultos');
@@ -154,8 +169,7 @@ app.get('/ocultos', requireAuth, (req, res) => {
 // Panel (protegido)
 // ---------------------------------------------------------------------------
 app.get('/', requireAuth, (req, res) => {
-  const raw   = getChats();
-  const chats = raw.map(c => ({ ...c, category: categorize(c.sample_text) }));
+  const chats = getChats();
   const stats = getStats();
   res.render('index', { chats, stats });
 });
@@ -166,8 +180,22 @@ app.get('/pendientes', requireAuth, (req, res) => {
 });
 
 app.get('/estadisticas', requireAuth, (req, res) => {
-  const data = getActivityStats();
-  res.render('estadisticas', { data });
+  const { from, to, preset } = req.query;
+  let fromTs = null, toTs = null;
+
+  if (preset) {
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+    if      (preset === 'semana')    { fromTs = now - 7  * day; toTs = now; }
+    else if (preset === 'mes')       { fromTs = now - 30 * day; toTs = now; }
+    else if (preset === 'trimestre') { fromTs = now - 90 * day; toTs = now; }
+  } else if (from && to) {
+    fromTs = new Date(from + 'T00:00:00').getTime();
+    toTs   = new Date(to   + 'T23:59:59').getTime();
+  }
+
+  const data = getActivityStats({ from: fromTs, to: toTs });
+  res.render('estadisticas', { data, from: from || '', to: to || '', preset: preset || '' });
 });
 
 app.get('/buscar', requireAuth, (req, res) => {

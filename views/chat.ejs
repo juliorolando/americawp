@@ -144,6 +144,41 @@
     nav a { color: rgba(255,255,255,.7); text-decoration: none; padding: 8px 16px; font-size: .8rem; font-weight: 500; white-space: nowrap; border-bottom: 2px solid transparent; }
     nav a:hover { color: #fff; }
 
+    /* ── Status bar ── */
+    .status-bar {
+      background: #fff; border-bottom: 1px solid #ebebeb;
+      padding: 7px 15px; display: flex; align-items: center; gap: 7px; flex-shrink: 0;
+    }
+    .status-label { font-size: .68rem; color: #bbb; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; margin-right: 2px; }
+    .status-btn {
+      padding: 4px 13px; border-radius: 20px; border: 1.5px solid #e0e0e0;
+      background: #fff; font-size: .74rem; font-weight: 600; cursor: pointer;
+      color: #bbb; transition: all .15s;
+    }
+    .status-btn.active.pendiente  { border-color: #90a4ae; background: #eceff1; color: #546e7a; }
+    .status-btn.active.en_proceso { border-color: #ffb74d; background: #fff3e0; color: #e65100; }
+    .status-btn.active.resuelto   { border-color: #66bb6a; background: #e8f5e9; color: #2e7d32; }
+
+    /* ── Notes panel ── */
+    .notes-panel { flex-shrink: 0; background: #fffde7; border-top: 1px solid #ffe082; }
+    .notes-header {
+      padding: 8px 15px; font-size: .78rem; font-weight: 600; color: #f57f17;
+      cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+      user-select: none;
+    }
+    .notes-body { padding: 0 15px 12px; display: none; }
+    .notes-body.open { display: block; }
+    .notes-body textarea {
+      width: 100%; min-height: 75px; border: 1px solid #ffe082; border-radius: 6px;
+      padding: 8px 10px; font-size: .85rem; font-family: inherit;
+      background: #fff; resize: vertical; outline: none; line-height: 1.45;
+    }
+    .notes-body textarea:focus { border-color: #f9a825; }
+    .notes-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+    .notes-save { background: #f57f17; color: #fff; border: none; border-radius: 6px; padding: 5px 16px; font-size: .78rem; font-weight: 600; cursor: pointer; }
+    .notes-save:hover { background: #e65100; }
+    #notes-status { font-size: .72rem; color: #aaa; }
+
     @media (max-width: 480px) {
       .bubble-row { max-width: 88%; }
       .resp-badge { display: none; }
@@ -192,6 +227,13 @@
     </div>
   </header>
 
+  <div class="status-bar">
+    <span class="status-label">Estado</span>
+    <button class="status-btn <%= chat.status === 'pendiente'  ? 'active pendiente'  : '' %>" data-status="pendiente"  onclick="cambiarEstado(this)">Pendiente</button>
+    <button class="status-btn <%= chat.status === 'en_proceso' ? 'active en_proceso' : '' %>" data-status="en_proceso" onclick="cambiarEstado(this)">En proceso</button>
+    <button class="status-btn <%= chat.status === 'resuelto'   ? 'active resuelto'   : '' %>" data-status="resuelto"   onclick="cambiarEstado(this)">Resuelto</button>
+  </div>
+
   <div class="messages" id="msgs">
     <% if (messages.length === 0) { %>
       <p class="empty">No hay mensajes registrados en este chat.</p>
@@ -228,11 +270,70 @@
     <% }); } %>
   </div>
 
+  <div class="notes-panel">
+    <div class="notes-header" onclick="toggleNotas()">
+      <span>📝 Notas internas</span>
+      <span id="notes-toggle"><%= chat.notes ? '▼' : '▲' %></span>
+    </div>
+    <div class="notes-body <%= chat.notes ? 'open' : '' %>" id="notes-body">
+      <textarea id="notes-input" placeholder="Anotá contexto privado sobre este contacto (solo visible en el panel)…"><%= chat.notes %></textarea>
+      <div class="notes-footer">
+        <span id="notes-status"></span>
+        <button class="notes-save" onclick="guardarNotas()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const msgs = document.getElementById('msgs');
     msgs.scrollTop = 9999999;
-    // Auto-refresh cada 15 s; vuelve al scroll inferior automáticamente
-    setInterval(() => location.reload(), 15000);
+
+    // Pausa el auto-refresh mientras el usuario escribe notas
+    const notesInput = document.getElementById('notes-input');
+    let notesActivo = false;
+    notesInput.addEventListener('focus', () => notesActivo = true);
+    notesInput.addEventListener('blur',  () => notesActivo = false);
+    setInterval(() => { if (!notesActivo) location.reload(); }, 15000);
+
+    function toggleNotas() {
+      const body   = document.getElementById('notes-body');
+      const toggle = document.getElementById('notes-toggle');
+      body.classList.toggle('open');
+      toggle.textContent = body.classList.contains('open') ? '▼' : '▲';
+    }
+
+    function guardarNotas() {
+      const notes  = notesInput.value;
+      const status = document.getElementById('notes-status');
+      fetch('/chat/<%= chat.id %>/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes }),
+      })
+      .then(r => r.json())
+      .then(d => {
+        status.textContent = d.ok ? 'Guardado ✓' : 'Error';
+        setTimeout(() => status.textContent = '', 2500);
+      })
+      .catch(() => { status.textContent = 'Error de red'; });
+    }
+
+    function cambiarEstado(btn) {
+      const status = btn.dataset.status;
+      fetch('/chat/<%= chat.id %>/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      .then(r => r.json())
+      .then(d => {
+        if (!d.ok) return;
+        document.querySelectorAll('.status-btn').forEach(b =>
+          b.classList.remove('active', 'pendiente', 'en_proceso', 'resuelto'));
+        btn.classList.add('active', status);
+      })
+      .catch(() => {});
+    }
   </script>
 </body>
 </html>
