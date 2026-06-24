@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WasapPanel — Recepción</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f2f5;
+      color: #111;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #25D366;
+      color: #fff;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      box-shadow: 0 1px 3px rgba(0,0,0,.15);
+    }
+    header h1 { font-size: 1.15rem; font-weight: 600; }
+    header span { font-size: .85rem; opacity: .85; margin-left: auto; }
+
+    main { max-width: 680px; margin: 0 auto; padding: 16px 12px; }
+
+    .chat-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .chat-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      text-decoration: none;
+      color: inherit;
+      box-shadow: 0 1px 2px rgba(0,0,0,.08);
+      transition: box-shadow .15s;
+    }
+    .chat-card:hover { box-shadow: 0 3px 8px rgba(0,0,0,.12); }
+
+    .avatar {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: #25D366;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .chat-info { flex: 1; min-width: 0; }
+    .chat-name { font-weight: 600; font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chat-preview {
+      font-size: .82rem;
+      color: #667;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 3px;
+    }
+
+    .chat-meta { text-align: right; flex-shrink: 0; }
+    .chat-time { font-size: .75rem; color: #999; }
+    .chat-count {
+      display: inline-block;
+      margin-top: 4px;
+      background: #25D366;
+      color: #fff;
+      border-radius: 10px;
+      font-size: .72rem;
+      padding: 1px 7px;
+    }
+
+    .empty { text-align: center; color: #999; margin-top: 60px; font-size: .95rem; }
+
+    @media (max-width: 480px) {
+      .chat-card { padding: 12px; }
+      .avatar { width: 40px; height: 40px; font-size: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>WasapPanel</h1>
+    <span><%= chats.length %> chat<%= chats.length !== 1 ? 's' : '' %></span>
+  </header>
+
+  <main>
+    <% if (chats.length === 0) { %>
+      <p class="empty">Ningún chat registrado todavía.<br>Iniciá el monitor y abrí un chat en WhatsApp Web.</p>
+    <% } else { %>
+      <div class="chat-list">
+        <% chats.forEach(function(chat) {
+          const initial = (chat.phone_or_name || '?')[0].toUpperCase();
+          const d = new Date(chat.last_seen);
+          const today = new Date();
+          let timeLabel;
+          if (d.toDateString() === today.toDateString()) {
+            timeLabel = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+          } else {
+            timeLabel = d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+          }
+        %>
+          <a class="chat-card" href="/chat/<%= chat.id %>">
+            <div class="avatar"><%= initial %></div>
+            <div class="chat-info">
+              <div class="chat-name"><%= chat.phone_or_name %></div>
+              <div class="chat-preview"><%= chat.last_message || '—' %></div>
+            </div>
+            <div class="chat-meta">
+              <div class="chat-time"><%= timeLabel %></div>
+              <div class="chat-count"><%= chat.message_count %></div>
+            </div>
+          </a>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>
