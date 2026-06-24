@@ -145,6 +145,8 @@ function getPendingChats() {
     FROM chats c
     JOIN messages m ON m.chat_id = c.id
     WHERE (SELECT direction FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) = 'in'
+      AND c.status != 'resuelto'
+      AND c.hidden = 0
     GROUP BY c.id
     ORDER BY c.last_seen ASC
   `).all();
@@ -199,6 +201,8 @@ function getStats() {
   const sinRespuesta   = db.prepare(`
     SELECT COUNT(*) AS n FROM chats
     WHERE last_seen >= ?
+      AND status != 'resuelto'
+      AND hidden = 0
       AND (SELECT direction FROM messages WHERE chat_id = chats.id ORDER BY timestamp DESC LIMIT 1) = 'in'
   `).get(ts).n;
 
