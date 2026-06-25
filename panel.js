@@ -110,7 +110,9 @@ app.get('/login', (req, res) => {
 
 app.post('/login', (req, res) => {
   const { user, pass } = req.body;
-  if (user === process.env.PANEL_USER && pass === process.env.PANEL_PASS) {
+  const users = JSON.parse(process.env.PANEL_USERS || '[]');
+  const match = users.find(u => u.user === user && u.pass === pass);
+  if (match) {
     req.session.authenticated = true;
     req.session.username = user;
     return res.redirect('/');
