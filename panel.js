@@ -155,6 +155,50 @@ app.post('/chat/:id/notes', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/chat/:id/summarize', requireAuth, async (req, res) => {
+  const chat = getChat(req.params.id);
+  if (!chat) return res.status(404).json({ ok: false, error: 'Chat no encontrado' });
+
+  const messages = getMessages(req.params.id);
+  if (!messages.length) return res.json({ ok: false, error: 'Sin mensajes' });
+
+  const convo = messages.slice(-80).map(m =>
+    `${m.direction === 'in' ? chat.phone_or_name : 'Recepción'}: ${m.body}`
+  ).join('\n');
+
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          {
+            role: 'system',
+            content: 'Sos un asistente que analiza conversaciones de WhatsApp de un hotel. Respondé siempre en español. Resumí la conversación en 2 o 3 oraciones cortas y directas: qué quiere el cliente, qué le respondió la recepción, y si quedó algo pendiente. Sin viñetas ni títulos, solo texto corrido.',
+          },
+          {
+            role: 'user',
+            content: `Conversación con ${chat.phone_or_name}:\n\n${convo}`,
+          },
+        ],
+        max_tokens: 180,
+        temperature: 0.2,
+      }),
+    });
+    const data = await r.json();
+    const summary = data.choices?.[0]?.message?.content?.trim();
+    if (!summary) return res.json({ ok: false, error: 'Sin respuesta del modelo' });
+    res.json({ ok: true, summary });
+  } catch (err) {
+    console.error('[AI] Error Groq:', err.message);
+    res.status(500).json({ ok: false, error: 'Error al conectar con Groq' });
+  }
+});
+
 app.post('/chat/:id/show', requireAuth, (req, res) => {
   unhideChat(req.params.id);
   res.redirect('/ocultos');
