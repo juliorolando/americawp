@@ -81,7 +81,7 @@ const stmts = {
     ORDER BY last_message_ts DESC
   `),
   getChat:     db.prepare('SELECT * FROM chats WHERE id = ?'),
-  getMsgs:     db.prepare('SELECT * FROM messages WHERE chat_id = ? ORDER BY timestamp ASC'),
+  getMsgs:     db.prepare('SELECT * FROM messages WHERE chat_id = ? ORDER BY timestamp ASC, id ASC'),
 };
 
 function upsertChat(phoneOrName) {

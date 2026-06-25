@@ -19,6 +19,9 @@ const SELECTORS = {
     { sel: '[data-testid="audio-player"]',   label: '🎤 Audio'     },
     { sel: '[data-testid="document-thumb"]', label: '📄 Documento' },
     { sel: '[data-testid="sticker-kf"]',     label: '🎨 Sticker'   },
+    { sel: '[data-testid="map"]',            label: '📍 Ubicación'  },
+    { sel: '[data-testid="vcard"]',          label: '👤 Contacto'  },
+    { sel: '[data-testid="poll-creation"]',  label: '📊 Encuesta'  },
   ],
 };
 
@@ -131,7 +134,7 @@ function attachObserver() {
     const chatName  = getChatName();
 
     console.log(`[WasapPanel] [${direction.toUpperCase()}] ${chatName}: ${body.slice(0, 60)}`);
-    sendToBackground({ chatName, direction, body, timestamp: Date.now(), waId: dataId });
+    sendToBackground({ chatName, direction, body, timestamp: parseTimestamp(node) || Date.now(), waId: dataId });
     return true;
   }
 

@@ -34,13 +34,14 @@
     .section-title { font-size: .82rem; font-weight: 700; color: #444; margin-bottom: 16px; text-transform: uppercase; letter-spacing: .4px; }
 
     /* ── Bar chart ── */
-    .chart-wrap { overflow-x: auto; }
-    .bar-chart { display: flex; align-items: flex-end; gap: 3px; height: 90px; min-width: max-content; }
-    .bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-    .bar { width: 18px; background: #25D366; border-radius: 2px 2px 0 0; min-height: 2px; transition: opacity .15s; }
-    .bar:hover { opacity: .75; }
-    .bar-val { font-size: .6rem; color: #bbb; text-align: center; }
-    .bar-lbl { font-size: .62rem; color: #aaa; text-align: center; white-space: nowrap; }
+    .chart-wrap { overflow-x: auto; padding-bottom: 2px; }
+    .bar-chart { display: flex; align-items: flex-end; gap: 5px; height: 155px; min-width: max-content; }
+    .bar-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .bar { width: 22px; background: #25D366; border-radius: 3px 3px 0 0; min-height: 2px; transition: filter .15s; cursor: default; }
+    .bar.peak { background: #0a6e43; }
+    .bar:hover { filter: brightness(.82); }
+    .bar-val { font-size: .65rem; color: #444; font-weight: 600; text-align: center; height: 14px; line-height: 14px; }
+    .bar-lbl { font-size: .68rem; color: #666; text-align: center; white-space: nowrap; font-weight: 500; height: 14px; line-height: 14px; }
 
     /* ── Day chart ── */
     .day-chart { display: flex; align-items: flex-end; gap: 4px; height: 90px; }
@@ -128,26 +129,30 @@
       <% if (data.total === 0) { %>
         <div class="empty-chart">Sin datos aún</div>
       <% } else { %>
+        <%
+          const peakHour  = data.byHour.reduce((a,b) => b.count > a.count ? b : a, data.byHour[0]);
+          const peakLbl   = String(peakHour.hour).padStart(2,'0') + ':00';
+          const maxBarH   = 115;
+          const threshold = Math.max(Math.round(maxHour * 0.12), 1);
+        %>
         <div class="chart-wrap">
           <div class="bar-chart">
             <% data.byHour.forEach(function(h) {
-              const pct = Math.round(h.count / maxHour * 100);
-              const lbl = String(h.hour).padStart(2, '0');
+              const barH   = h.count > 0 ? Math.max(Math.round(h.count / maxHour * maxBarH), 4) : 0;
+              const lbl    = String(h.hour).padStart(2, '0');
+              const isPeak = h.hour === peakHour.hour;
+              const showVal = h.count >= threshold;
             %>
               <div class="bar-col">
-                <div class="bar-val"><%= h.count > 0 ? h.count : '' %></div>
-                <div class="bar" style="height:<%= Math.max(pct, h.count > 0 ? 3 : 0) %>px;" title="<%= lbl %>h: <%= h.count %> msgs"></div>
-                <div class="bar-lbl"><%= h.hour % 3 === 0 ? lbl : '' %></div>
+                <div class="bar-val"><%= showVal ? h.count : '' %></div>
+                <div class="bar <%= isPeak ? 'peak' : '' %>" style="height:<%= barH %>px;" title="<%= lbl %>:00 — <%= h.count %> mensajes"></div>
+                <div class="bar-lbl"><%= h.hour % 3 === 0 ? lbl + 'h' : '' %></div>
               </div>
             <% }); %>
           </div>
         </div>
-        <%
-          const peakHour = data.byHour.reduce((a,b) => b.count > a.count ? b : a, data.byHour[0]);
-          const peakLbl  = String(peakHour.hour).padStart(2,'0') + ':00';
-        %>
-        <p style="font-size:.75rem;color:#888;margin-top:12px;">
-          Pico de actividad: <strong><%= peakLbl %> h</strong> con <strong><%= peakHour.count %></strong> mensajes
+        <p style="font-size:.75rem;color:#888;margin-top:10px;">
+          Pico de actividad: <strong style="color:#0a6e43"><%= peakLbl %> h</strong> con <strong><%= peakHour.count %></strong> mensajes
         </p>
       <% } %>
     </div>
