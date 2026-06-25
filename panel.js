@@ -82,6 +82,16 @@ function requireAuth(req, res, next) {
   res.redirect('/login');
 }
 
+function requireAdmin(req, res, next) {
+  if (req.session && req.session.authenticated && req.session.username === 'admin') return next();
+  res.status(403).redirect('/');
+}
+
+app.use((req, res, next) => {
+  res.locals.isAdmin = req.session?.username === 'admin';
+  next();
+});
+
 function requireApiKey(req, res, next) {
   const key = req.headers['x-api-key'];
   if (!key || key !== process.env.API_KEY) {
@@ -102,6 +112,7 @@ app.post('/login', (req, res) => {
   const { user, pass } = req.body;
   if (user === process.env.PANEL_USER && pass === process.env.PANEL_PASS) {
     req.session.authenticated = true;
+    req.session.username = user;
     return res.redirect('/');
   }
   res.render('login', { error: 'Usuario o contraseña incorrectos.' });
@@ -214,7 +225,7 @@ app.post('/chat/:id/summarize', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/chat/:id/show', requireAuth, (req, res) => {
+app.post('/chat/:id/show', requireAdmin, (req, res) => {
   unhideChat(req.params.id);
   res.redirect('/ocultos');
 });
@@ -224,7 +235,7 @@ app.get('/contactos', requireAuth, (req, res) => {
   res.render('contactos', { contacts });
 });
 
-app.get('/ocultos', requireAuth, (req, res) => {
+app.get('/ocultos', requireAdmin, (req, res) => {
   const chats = getHiddenChats();
   res.render('ocultos', { chats });
 });

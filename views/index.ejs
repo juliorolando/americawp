@@ -102,7 +102,7 @@
     <a href="/contactos">Contactos</a>
     <a href="/estadisticas">Estadísticas</a>
     <a href="/buscar">Buscar</a>
-    <a href="/ocultos">Ocultos</a>
+    <% if (isAdmin) { %><a href="/ocultos">Ocultos</a><% } %>
   </nav>
 
   <main>
