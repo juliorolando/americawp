@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "WasapPanel Monitor",
+  "name": "Monitor",
   "version": "1.0.0",
-  "description": "Registra mensajes de WhatsApp Web en el panel de supervisión local",
+  "description": "Monitor 2",
   "host_permissions": [
     "https://web.whatsapp.com/*",
     "https://panel.hosteriaamerica.com/*"
@@ -18,6 +18,6 @@
     }
   ],
   "action": {
-    "default_title": "WasapPanel Monitor"
+    "default_title": "Monitor"
   }
 }
