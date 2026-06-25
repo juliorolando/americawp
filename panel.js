@@ -6,7 +6,18 @@ const path    = require('path');
 const { getChats, getChat, getMessages, upsertChat, saveMessage, saveMessagesBatch,
         getStats, getPendingChats, searchMessages, getActivityStats,
         hideChat, unhideChat, getHiddenChats,
-        setStatus, setNotes, getContacts } = require('./db');
+        setStatus, setNotes, setSummary, getContacts } = require('./db');
+
+// Devuelve solo los mensajes de la sesión actual (último bloque sin gap > 12 h)
+function currentSession(messages) {
+  if (!messages.length) return [];
+  const GAP = 12 * 3_600_000;
+  let start = 0;
+  for (let i = 1; i < messages.length; i++) {
+    if (messages[i].timestamp - messages[i - 1].timestamp > GAP) start = i;
+  }
+  return messages.slice(start, start + 80);
+}
 
 function categorize(text) {
   const t = (text || '').toLowerCase();
@@ -162,7 +173,10 @@ app.post('/chat/:id/summarize', requireAuth, async (req, res) => {
   const messages = getMessages(req.params.id);
   if (!messages.length) return res.json({ ok: false, error: 'Sin mensajes' });
 
-  const convo = messages.slice(-80).map(m =>
+  const session = currentSession(messages);
+  if (!session.length) return res.json({ ok: false, error: 'Sin mensajes en la sesión actual' });
+
+  const convo = session.map(m =>
     `${m.direction === 'in' ? chat.phone_or_name : 'Recepción'}: ${m.body}`
   ).join('\n');
 
@@ -192,6 +206,7 @@ app.post('/chat/:id/summarize', requireAuth, async (req, res) => {
     const data = await r.json();
     const summary = data.choices?.[0]?.message?.content?.trim();
     if (!summary) return res.json({ ok: false, error: 'Sin respuesta del modelo' });
+    setSummary(req.params.id, summary);
     res.json({ ok: true, summary });
   } catch (err) {
     console.error('[AI] Error Groq:', err.message);

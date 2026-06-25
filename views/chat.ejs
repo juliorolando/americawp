@@ -234,7 +234,7 @@
       <% if (avgLabel) { %>
         <span class="resp-badge">⏱ <%= avgLabel %> resp.</span>
       <% } %>
-      <button id="resumir-btn" class="action-btn" onclick="resumirChat()">🤖 Resumir</button>
+      <button id="resumir-btn" class="action-btn" onclick="resumirChat()"><%= chat.ai_summary ? '🔄 Regenerar' : '🤖 Resumir' %></button>
       <a class="action-btn" href="/export/<%= chat.id %>">Exportar .txt</a>
     </div>
   </header>
@@ -246,12 +246,12 @@
     <button class="status-btn <%= chat.status === 'resuelto'   ? 'active resuelto'   : '' %>" data-status="resuelto"   onclick="cambiarEstado(this)">Resuelto</button>
   </div>
 
-  <div class="ai-panel" id="ai-panel" style="display:none;">
+  <div class="ai-panel" id="ai-panel" style="<%= chat.ai_summary ? '' : 'display:none;' %>">
     <div class="ai-header">
-      🤖 Resumen de la conversación
+      🤖 Resumen de la sesión actual
       <button class="ai-close" onclick="document.getElementById('ai-panel').style.display='none'">✕</button>
     </div>
-    <div class="ai-body" id="ai-body"></div>
+    <div class="ai-body" id="ai-body"><%= chat.ai_summary || '' %></div>
   </div>
 
   <div class="messages" id="msgs">
@@ -349,12 +349,16 @@
       try {
         const r = await fetch('/chat/<%= chat.id %>/summarize', { method: 'POST' });
         const d = await r.json();
-        body.textContent = d.ok ? d.summary : ('Error: ' + (d.error || 'sin respuesta'));
+        if (d.ok) {
+          body.textContent = d.summary;
+          btn.textContent  = '🔄 Regenerar';
+        } else {
+          body.textContent = 'Error: ' + (d.error || 'sin respuesta');
+        }
       } catch (_) {
         body.textContent = 'Error de red.';
       } finally {
-        btn.textContent = '🤖 Resumir';
-        btn.disabled    = false;
+        btn.disabled = false;
       }
     }
 

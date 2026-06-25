@@ -50,6 +50,9 @@ try {
   if (!chatCols.find(c => c.name === 'notes')) {
     db.exec("ALTER TABLE chats ADD COLUMN notes TEXT NOT NULL DEFAULT ''");
   }
+  if (!chatCols.find(c => c.name === 'ai_summary')) {
+    db.exec("ALTER TABLE chats ADD COLUMN ai_summary TEXT NOT NULL DEFAULT ''");
+  }
 } catch (_) {}
 
 const stmts = {
@@ -65,6 +68,7 @@ const stmts = {
       c.phone_or_name,
       c.last_seen,
       c.status,
+      c.ai_summary,
       COUNT(m.id) AS message_count,
       (SELECT body      FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_message,
       (SELECT direction FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_direction,
@@ -229,7 +233,8 @@ function getContacts() {
 function hideChat(id)     { db.prepare('UPDATE chats SET hidden = 1 WHERE id = ?').run(id); }
 function unhideChat(id)   { db.prepare('UPDATE chats SET hidden = 0 WHERE id = ?').run(id); }
 function setStatus(id, status) { db.prepare('UPDATE chats SET status = ? WHERE id = ?').run(status, id); }
-function setNotes(id, notes)   { db.prepare('UPDATE chats SET notes = ? WHERE id = ?').run(notes, id); }
+function setNotes(id, notes)     { db.prepare('UPDATE chats SET notes = ? WHERE id = ?').run(notes, id); }
+function setSummary(id, summary) { db.prepare('UPDATE chats SET ai_summary = ? WHERE id = ?').run(summary, id); }
 
 function getHiddenChats() {
   return db.prepare(`
@@ -247,4 +252,4 @@ function getHiddenChats() {
   `).all();
 }
 
-module.exports = { db, upsertChat, saveMessage, saveMessagesBatch, getChats, getMessages, getChat, getStats, getPendingChats, searchMessages, getActivityStats, getContacts, hideChat, unhideChat, getHiddenChats, setStatus, setNotes };
+module.exports = { db, upsertChat, saveMessage, saveMessagesBatch, getChats, getMessages, getChat, getStats, getPendingChats, searchMessages, getActivityStats, getContacts, hideChat, unhideChat, getHiddenChats, setStatus, setNotes, setSummary };

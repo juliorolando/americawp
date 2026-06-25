@@ -68,6 +68,13 @@
     .badge-resuelto { background: #e8f5e9; color: #1b5e20; }
     .chat-preview { font-size: .8rem; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; }
     .chat-preview.out::before { content: '✓ '; color: #25D366; }
+    .chat-summary { font-size: .75rem; color: #5c8bc4; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-style: italic; }
+    .resumir-card-btn {
+      margin-top: 5px; background: none; border: 1px solid #c5daf5; border-radius: 5px;
+      color: #5c8bc4; font-size: .7rem; padding: 2px 8px; cursor: pointer; line-height: 1.6;
+    }
+    .resumir-card-btn:hover { background: #e8f4fd; }
+    .resumir-card-btn:disabled { opacity: .55; cursor: default; }
     .chat-meta { text-align: right; flex-shrink: 0; }
     .chat-time { font-size: .72rem; color: #bbb; }
     .chat-count { display: inline-block; margin-top: 5px; background: #25D366; color: #fff; border-radius: 10px; font-size: .68rem; padding: 1px 8px; font-weight: 600; }
@@ -156,6 +163,12 @@
                   <% if (chat.status === 'resuelto')   { %><span class="badge badge-resuelto">✓ Resuelto</span><% } %>
                 </div>
                 <div class="chat-preview <%= chat.last_direction === 'out' ? 'out' : '' %>"><%= chat.last_message || '—' %></div>
+                <% if (chat.ai_summary) { %>
+                  <div class="chat-summary" id="summary-<%= chat.id %>">🤖 <%= chat.ai_summary %></div>
+                <% } else { %>
+                  <button class="resumir-card-btn" id="summary-btn-<%= chat.id %>"
+                          onclick="resumirCard(event, <%= chat.id %>)">🤖 Resumir sesión</button>
+                <% } %>
               </div>
               <div class="chat-meta">
                 <div class="chat-time"><%= timeLabel %></div>
@@ -207,6 +220,32 @@
           }
         })
         .catch(() => {});
+    }
+
+    async function resumirCard(e, id) {
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = document.getElementById('summary-btn-' + id);
+      if (!btn) return;
+      btn.textContent = '⏳ Analizando…';
+      btn.disabled = true;
+      try {
+        const r = await fetch('/chat/' + id + '/summarize', { method: 'POST' });
+        const d = await r.json();
+        if (d.ok) {
+          const el = document.createElement('div');
+          el.className = 'chat-summary';
+          el.id = 'summary-' + id;
+          el.textContent = '🤖 ' + d.summary;
+          btn.replaceWith(el);
+        } else {
+          btn.textContent = '🤖 Resumir sesión';
+          btn.disabled = false;
+        }
+      } catch (_) {
+        btn.textContent = '🤖 Resumir sesión';
+        btn.disabled = false;
+      }
     }
 
     // Auto-refresh cada 30 s, solo si el usuario no está filtrando
