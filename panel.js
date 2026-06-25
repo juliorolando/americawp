@@ -177,7 +177,7 @@ app.post('/chat/:id/summarize', requireAuth, async (req, res) => {
   if (!session.length) return res.json({ ok: false, error: 'Sin mensajes en la sesión actual' });
 
   const convo = session.map(m =>
-    `${m.direction === 'in' ? chat.phone_or_name : 'Recepción'}: ${m.body}`
+    `[${m.direction === 'in' ? 'CLIENTE' : 'RECEPCIÓN'}] ${m.body}`
   ).join('\n');
 
   try {
@@ -192,11 +192,11 @@ app.post('/chat/:id/summarize', requireAuth, async (req, res) => {
         messages: [
           {
             role: 'system',
-            content: 'Sos un asistente que analiza conversaciones de WhatsApp de un hotel. Respondé siempre en español. Resumí la conversación en 2 o 3 oraciones cortas y directas: qué quiere el cliente, qué le respondió la recepción, y si quedó algo pendiente. Sin viñetas ni títulos, solo texto corrido.',
+            content: 'Sos un asistente que analiza conversaciones de WhatsApp de un hotel. En la conversación, los mensajes etiquetados [CLIENTE] son del huésped o cliente externo que contacta al hotel. Los mensajes etiquetados [RECEPCIÓN] son del personal del hotel respondiendo. Respondé siempre en español. Resumí en 2 o 3 oraciones cortas y directas: qué quiere o consultó el cliente, qué le respondió la recepción, y si quedó algo pendiente. Sin viñetas ni títulos, solo texto corrido.',
           },
           {
             role: 'user',
-            content: `Conversación con ${chat.phone_or_name}:\n\n${convo}`,
+            content: `Conversación con el contacto "${chat.phone_or_name}":\n\n${convo}`,
           },
         ],
         max_tokens: 180,
