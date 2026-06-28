@@ -6,7 +6,7 @@ const path    = require('path');
 const { getChats, getChat, getMessages, upsertChat, saveMessage, saveMessagesBatch,
         getStats, getPendingChats, searchMessages, getActivityStats,
         hideChat, unhideChat, getHiddenChats,
-        setStatus, setNotes, setSummary, getContacts } = require('./db');
+        setStatus, setNotes, setSummary, getContacts, clearDatabase } = require('./db');
 
 // Devuelve solo los mensajes de la sesión actual (último bloque sin gap > 12 h)
 function currentSession(messages) {
@@ -230,6 +230,17 @@ app.post('/chat/:id/summarize', requireAuth, async (req, res) => {
 app.post('/chat/:id/show', requireAdmin, (req, res) => {
   unhideChat(req.params.id);
   res.redirect('/ocultos');
+});
+
+app.post('/admin/clear-db', requireAdmin, (req, res) => {
+  try {
+    clearDatabase();
+    console.log(`[ADMIN] Base de datos limpiada por ${req.session.username}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[ADMIN] Error al limpiar la base de datos:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 app.get('/contactos', requireAuth, (req, res) => {

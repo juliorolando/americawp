@@ -29,23 +29,12 @@ let observer         = null;
 let currentContainer = null;
 
 function isOutgoing(node) {
-  const textEl        = node.querySelector(SELECTORS.msgText);
-  const probe         = textEl || node;
-  const probeRect     = probe.getBoundingClientRect();
-  const containerRect = currentContainer.getBoundingClientRect();
-
-  if (probeRect.width > 0 && containerRect.width > 0) {
-    const probeCenter     = probeRect.left + probeRect.width / 2;
-    const containerCenter = containerRect.left + containerRect.width / 2;
-    return probeCenter > containerCenter;
-  }
-
-  if (node.querySelector(SELECTORS.deliveryCheck)) return true;
-
+  // 1. Más confiable: prefijo del data-id (true_ = enviado, false_ = recibido)
   const dataId = node.getAttribute('data-id') || '';
   if (dataId.startsWith('true_'))  return true;
   if (dataId.startsWith('false_')) return false;
 
+  // 2. Clases CSS específicas de mensajes salientes
   let el = node;
   while (el && el !== currentContainer) {
     if (el.classList) {
@@ -55,7 +44,37 @@ function isOutgoing(node) {
     }
     el = el.parentElement;
   }
+
+  // 3. Checkmarks de entrega (solo en mensajes salientes; excluye msg-time-read que aparece en ambos)
+  if (node.querySelector('[data-testid="msg-dbl-check"], [data-testid="msg-check"]')) return true;
+
+  // 4. Posición geométrica como último recurso
+  const textEl        = node.querySelector(SELECTORS.msgText);
+  const probe         = textEl || node;
+  const probeRect     = probe.getBoundingClientRect();
+  const containerRect = currentContainer.getBoundingClientRect();
+  if (probeRect.width > 0 && containerRect.width > 0) {
+    return (probeRect.left + probeRect.width / 2) > (containerRect.left + containerRect.width / 2);
+  }
+
   return false;
+}
+
+function getMessageBody(node) {
+  // Excluir el bloque citado (reply) para no capturar el texto original como nuevo mensaje
+  const quotedBlock = node.querySelector('[data-testid="quoted-message"]') ||
+                      node.querySelector('[data-testid="quoted-msg-container"]');
+
+  const allTextEls = [...node.querySelectorAll(SELECTORS.msgText)];
+  const textEl     = allTextEls.find(el => !quotedBlock || !quotedBlock.contains(el));
+  let body         = textEl ? textEl.innerText.trim() : '';
+
+  if (!body) {
+    for (const { sel, label } of SELECTORS.mediaTypes) {
+      if (node.querySelector(sel)) { body = label; break; }
+    }
+  }
+  return body;
 }
 
 // Lee el timestamp real del atributo data-pre-plain-text.
@@ -118,13 +137,7 @@ function attachObserver() {
   }
 
   function processNode(node, dataId) {
-    const textEl = node.querySelector(SELECTORS.msgText);
-    let body = textEl ? textEl.innerText.trim() : '';
-    if (!body) {
-      for (const { sel, label } of SELECTORS.mediaTypes) {
-        if (node.querySelector(sel)) { body = label; break; }
-      }
-    }
+    const body = getMessageBody(node);
     if (!body) return false;
 
     seen.add(dataId);
@@ -183,13 +196,7 @@ function attachObserver() {
       const dataId = node.getAttribute('data-id');
       if (!dataId || seen.has(dataId)) continue;
 
-      const textEl = node.querySelector(SELECTORS.msgText);
-      let body = textEl ? textEl.innerText.trim() : '';
-      if (!body) {
-        for (const { sel, label } of SELECTORS.mediaTypes) {
-          if (node.querySelector(sel)) { body = label; break; }
-        }
-      }
+      const body = getMessageBody(node);
       if (!body) continue;
 
       seen.add(dataId); // evita que el observer lo reenvíe si WhatsApp re-renderiza

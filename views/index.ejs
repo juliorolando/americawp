@@ -88,12 +88,52 @@
       .chat-card { padding: 11px 12px; }
       .avatar { width: 38px; height: 38px; }
     }
+
+    /* ── Modal limpiar DB ── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,.55);
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #fff; border-radius: 12px; padding: 28px 24px;
+      max-width: 360px; width: calc(100% - 32px);
+      box-shadow: 0 8px 32px rgba(0,0,0,.22);
+    }
+    .modal-icon { font-size: 2rem; text-align: center; margin-bottom: 10px; }
+    .modal-title { font-size: 1rem; font-weight: 700; color: #b71c1c; text-align: center; margin-bottom: 8px; }
+    .modal-desc { font-size: .82rem; color: #555; line-height: 1.55; text-align: center; margin-bottom: 18px; }
+    .modal-desc strong { color: #b71c1c; }
+    .modal-input {
+      width: 100%; padding: 9px 12px; border: 2px solid #e0e0e0; border-radius: 8px;
+      font-size: .9rem; text-align: center; letter-spacing: .08em; outline: none;
+      transition: border-color .15s; margin-bottom: 16px;
+    }
+    .modal-input:focus { border-color: #e53935; }
+    .modal-actions { display: flex; gap: 10px; }
+    .modal-cancel {
+      flex: 1; padding: 9px; border: 1.5px solid #e0e0e0; border-radius: 8px;
+      background: #fff; font-size: .85rem; font-weight: 600; color: #777; cursor: pointer;
+    }
+    .modal-cancel:hover { background: #f5f5f5; }
+    .modal-confirm {
+      flex: 1; padding: 9px; border: none; border-radius: 8px;
+      background: #e53935; font-size: .85rem; font-weight: 600; color: #fff; cursor: pointer;
+      transition: background .15s, opacity .15s;
+    }
+    .modal-confirm:disabled { opacity: .38; cursor: not-allowed; }
+    .modal-confirm:not(:disabled):hover { background: #b71c1c; }
   </style>
 </head>
 <body>
   <header>
     <div class="logo">Wasap<span>Panel</span></div>
     <div class="spacer"></div>
+    <% if (isAdmin) { %>
+      <button onclick="abrirModalLimpiar()" style="background:rgba(229,57,53,.35);border:none;color:#fff;font-size:.78rem;padding:5px 12px;border-radius:6px;cursor:pointer;margin-right:4px;" title="Solo admin">🗑 Limpiar BD</button>
+    <% } %>
     <form method="POST" action="/logout"><button type="submit">Salir</button></form>
   </header>
   <nav>
@@ -253,5 +293,61 @@
       if (!search || !search.value.trim()) location.reload();
     }, 30000);
   </script>
+
+  <% if (isAdmin) { %>
+  <div class="modal-overlay" id="modal-limpiar">
+    <div class="modal-box">
+      <div class="modal-icon">⚠️</div>
+      <div class="modal-title">Limpiar base de datos</div>
+      <div class="modal-desc">
+        Esta acción borrará <strong>todos los chats y mensajes</strong> de forma permanente.<br>
+        No se puede deshacer.<br><br>
+        Escribí <strong>BORRAR</strong> para confirmar.
+      </div>
+      <input class="modal-input" id="confirm-input" type="text" placeholder="BORRAR" autocomplete="off" oninput="checkConfirm()">
+      <div class="modal-actions">
+        <button class="modal-cancel" onclick="cerrarModalLimpiar()">Cancelar</button>
+        <button class="modal-confirm" id="confirm-btn" disabled onclick="ejecutarLimpiar()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function abrirModalLimpiar() {
+      document.getElementById('confirm-input').value = '';
+      document.getElementById('confirm-btn').disabled = true;
+      document.getElementById('modal-limpiar').classList.add('open');
+      setTimeout(() => document.getElementById('confirm-input').focus(), 80);
+    }
+    function cerrarModalLimpiar() {
+      document.getElementById('modal-limpiar').classList.remove('open');
+    }
+    function checkConfirm() {
+      const val = document.getElementById('confirm-input').value.trim();
+      document.getElementById('confirm-btn').disabled = val !== 'BORRAR';
+    }
+    async function ejecutarLimpiar() {
+      const btn = document.getElementById('confirm-btn');
+      btn.textContent = 'Borrando…';
+      btn.disabled = true;
+      try {
+        const r = await fetch('/admin/clear-db', { method: 'POST' });
+        const d = await r.json();
+        if (d.ok) {
+          location.reload();
+        } else {
+          alert('Error: ' + (d.error || 'desconocido'));
+          cerrarModalLimpiar();
+        }
+      } catch (_) {
+        alert('Error de red.');
+        cerrarModalLimpiar();
+      }
+    }
+    document.getElementById('modal-limpiar').addEventListener('click', function(e) {
+      if (e.target === this) cerrarModalLimpiar();
+    });
+  </script>
+  <% } %>
 </body>
 </html>

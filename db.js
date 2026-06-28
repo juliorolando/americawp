@@ -236,6 +236,19 @@ function setStatus(id, status) { db.prepare('UPDATE chats SET status = ? WHERE i
 function setNotes(id, notes)     { db.prepare('UPDATE chats SET notes = ? WHERE id = ?').run(notes, id); }
 function setSummary(id, summary) { db.prepare('UPDATE chats SET ai_summary = ? WHERE id = ?').run(summary, id); }
 
+function clearDatabase() {
+  db.exec('BEGIN');
+  try {
+    db.exec('DELETE FROM messages');
+    db.exec('DELETE FROM chats');
+    db.exec("DELETE FROM sqlite_sequence WHERE name IN ('messages', 'chats')");
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
 function getHiddenChats() {
   return db.prepare(`
     SELECT
@@ -252,4 +265,4 @@ function getHiddenChats() {
   `).all();
 }
 
-module.exports = { db, upsertChat, saveMessage, saveMessagesBatch, getChats, getMessages, getChat, getStats, getPendingChats, searchMessages, getActivityStats, getContacts, hideChat, unhideChat, getHiddenChats, setStatus, setNotes, setSummary };
+module.exports = { db, upsertChat, saveMessage, saveMessagesBatch, getChats, getMessages, getChat, getStats, getPendingChats, searchMessages, getActivityStats, getContacts, hideChat, unhideChat, getHiddenChats, setStatus, setNotes, setSummary, clearDatabase };
