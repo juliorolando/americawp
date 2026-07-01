@@ -2,3 +2,6 @@ whatsapp-session/
 *.db
 node_modules/
 .env
+*.db-shm
+*.db-wal
+*.sqlite3
