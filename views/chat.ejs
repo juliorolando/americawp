@@ -189,6 +189,21 @@
     .ai-body { padding: 0 15px 12px; font-size: .85rem; color: #1a237e; line-height: 1.6; }
     .ai-loading { color: #5c8bc4; font-style: italic; }
 
+    /* ── Quality panel ── */
+    .quality-panel { flex-shrink: 0; border-top: 1px solid #ccc; }
+    .quality-panel.ok       { background: #e8f5e9; border-top-color: #a5d6a7; }
+    .quality-panel.revisar  { background: #ffebee; border-top-color: #ef9a9a; }
+    .quality-header {
+      padding: 8px 15px; font-size: .78rem; font-weight: 600;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .quality-panel.ok      .quality-header { color: #2e7d32; }
+    .quality-panel.revisar .quality-header { color: #c62828; }
+    .quality-close { background: none; border: none; cursor: pointer; font-size: 1rem; line-height: 1; padding: 0; color: inherit; }
+    .quality-body { padding: 0 15px 12px; font-size: .85rem; line-height: 1.6; }
+    .quality-panel.ok      .quality-body { color: #1b5e20; }
+    .quality-panel.revisar .quality-body { color: #b71c1c; }
+
     @media (max-width: 480px) {
       .bubble-row { max-width: 88%; }
       .resp-badge { display: none; }
@@ -221,7 +236,7 @@
     <a href="/contactos">Contactos</a>
     <a href="/estadisticas">Estadísticas</a>
     <a href="/buscar">Buscar</a>
-    <% if (isAdmin) { %><a href="/ocultos">Ocultos</a><% } %>
+    <% if (isAdmin) { %><a href="/ocultos">Ocultos</a><a href="/turnos">Turnos</a><% } %>
   </nav>
   <header>
     <a class="back" href="/" title="Volver">&#8592;</a>
@@ -235,6 +250,7 @@
         <span class="resp-badge">⏱ <%= avgLabel %> resp.</span>
       <% } %>
       <button id="resumir-btn" class="action-btn" onclick="resumirChat()"><%= chat.ai_summary ? '🔄 Regenerar' : '🤖 Resumir' %></button>
+      <button id="calidad-btn" class="action-btn" onclick="analizarCalidad()"><%= chat.quality_flag ? '🔄 Re-analizar' : '🔍 Analizar calidad' %></button>
       <a class="action-btn" href="/export/<%= chat.id %>">Exportar .txt</a>
     </div>
   </header>
@@ -252,6 +268,14 @@
       <button class="ai-close" onclick="document.getElementById('ai-panel').style.display='none'">✕</button>
     </div>
     <div class="ai-body" id="ai-body"><%= chat.ai_summary || '' %></div>
+  </div>
+
+  <div class="quality-panel <%= chat.quality_flag %>" id="quality-panel" style="<%= chat.quality_flag ? '' : 'display:none;' %>">
+    <div class="quality-header">
+      <span id="quality-title"><%= chat.quality_flag === 'revisar' ? '⚠ Revisar calidad' : '✓ Calidad OK' %></span>
+      <button class="quality-close" onclick="document.getElementById('quality-panel').style.display='none'">✕</button>
+    </div>
+    <div class="quality-body" id="quality-body"><%= chat.quality_notes || '' %></div>
   </div>
 
   <div class="messages" id="msgs">
@@ -357,6 +381,37 @@
         }
       } catch (_) {
         body.textContent = 'Error de red.';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function analizarCalidad() {
+      const btn   = document.getElementById('calidad-btn');
+      const panel = document.getElementById('quality-panel');
+      const title = document.getElementById('quality-title');
+      const body  = document.getElementById('quality-body');
+      btn.textContent = 'Analizando…';
+      btn.disabled    = true;
+      panel.style.display = 'block';
+      panel.classList.remove('ok', 'revisar');
+      title.textContent = '⏳ Analizando…';
+      body.textContent = '';
+      try {
+        const r = await fetch('/chat/<%= chat.id %>/analyze-quality', { method: 'POST' });
+        const d = await r.json();
+        if (d.ok) {
+          panel.classList.add(d.flag);
+          title.textContent = d.flag === 'revisar' ? '⚠ Revisar calidad' : '✓ Calidad OK';
+          body.textContent  = d.notes;
+          btn.textContent   = '🔄 Re-analizar';
+        } else {
+          title.textContent = 'Error';
+          body.textContent  = d.error || 'sin respuesta';
+        }
+      } catch (_) {
+        title.textContent = 'Error';
+        body.textContent  = 'Error de red.';
       } finally {
         btn.disabled = false;
       }

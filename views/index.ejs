@@ -142,7 +142,7 @@
     <a href="/contactos">Contactos</a>
     <a href="/estadisticas">Estadísticas</a>
     <a href="/buscar">Buscar</a>
-    <% if (isAdmin) { %><a href="/ocultos">Ocultos</a><% } %>
+    <% if (isAdmin) { %><a href="/ocultos">Ocultos</a><a href="/turnos">Turnos</a><% } %>
   </nav>
 
   <main>
@@ -201,6 +201,8 @@
                   <% if (sinResp && isToday) { %><span class="badge badge-sinr">SIN RESP</span><% } %>
                   <% if (chat.status === 'en_proceso') { %><span class="badge badge-proceso">En proceso</span><% } %>
                   <% if (chat.status === 'resuelto')   { %><span class="badge badge-resuelto">✓ Resuelto</span><% } %>
+                  <% if (chat.quality_flag === 'revisar') { %><span class="badge" style="background:#ffebee;color:#c62828;">⚠ Revisar calidad</span><% } %>
+                  <% if (chat.category) { %><span class="badge" style="background:<%= chat.category.bg %>;color:<%= chat.category.color %>;"><%= chat.category.label %></span><% } %>
                 </div>
                 <div class="chat-preview <%= chat.last_direction === 'out' ? 'out' : '' %>"><%= chat.last_message || '—' %></div>
                 <% if (chat.ai_summary) { %>

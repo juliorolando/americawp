@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Turnos — WasapPanel</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #111; min-height: 100vh; }
+
+    header { background: #128C7E; color: #fff; padding: 12px 18px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 20; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+    .logo { font-size: 1.1rem; font-weight: 700; letter-spacing: -.3px; }
+    .logo span { color: #a5d6a7; }
+    header .spacer { flex: 1; }
+    header form button { background: rgba(255,255,255,.15); border: none; color: #fff; font-size: .78rem; padding: 5px 12px; border-radius: 6px; cursor: pointer; }
+    header form button:hover { background: rgba(255,255,255,.25); }
+
+    nav { background: #0f7268; display: flex; overflow-x: auto; scrollbar-width: none; }
+    nav::-webkit-scrollbar { display: none; }
+    nav a { color: rgba(255,255,255,.7); text-decoration: none; padding: 10px 18px; font-size: .82rem; font-weight: 500; white-space: nowrap; border-bottom: 2px solid transparent; transition: color .15s; }
+    nav a:hover { color: #fff; }
+    nav a.active { color: #fff; border-bottom-color: #25D366; }
+
+    main { max-width: 700px; margin: 0 auto; padding: 20px 12px 40px; }
+
+    .page-title { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+    .page-sub   { font-size: .82rem; color: #888; margin-bottom: 18px; line-height: 1.5; }
+
+    .shift-card {
+      background: #fff; border-radius: 10px; padding: 16px 18px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.07); margin-bottom: 12px;
+    }
+    .shift-title { font-size: .88rem; font-weight: 700; color: #128C7E; margin-bottom: 12px; }
+    .shift-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field.full { grid-column: 1 / -1; }
+    .field label { font-size: .68rem; color: #999; text-transform: uppercase; letter-spacing: .4px; }
+    .field input {
+      padding: 8px 10px; border: 1.5px solid #e0e0e0; border-radius: 7px;
+      font-size: .85rem; outline: none; font-family: inherit;
+    }
+    .field input:focus { border-color: #128C7E; }
+    .shift-footer { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 12px; }
+    .shift-status { font-size: .75rem; color: #aaa; }
+    .shift-save {
+      background: #128C7E; color: #fff; border: none; border-radius: 7px;
+      padding: 7px 18px; font-size: .82rem; font-weight: 600; cursor: pointer;
+    }
+    .shift-save:hover { background: #0f7268; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">Wasap<span>Panel</span></div>
+    <div class="spacer"></div>
+    <form method="POST" action="/logout"><button>Salir</button></form>
+  </header>
+  <nav>
+    <a href="/">Chats</a>
+    <a href="/pendientes">Pendientes</a>
+    <a href="/contactos">Contactos</a>
+    <a href="/estadisticas">Estadísticas</a>
+    <a href="/buscar">Buscar</a>
+    <% if (isAdmin) { %><a href="/ocultos">Ocultos</a><a href="/turnos" class="active">Turnos</a><% } %>
+  </nav>
+
+  <main>
+    <div class="page-title">Configuración de turnos</div>
+    <div class="page-sub">
+      Definí las franjas horarias de cada turno (hora de 0 a 23) para agrupar las estadísticas de tiempo de respuesta.
+      El nombre del empleado es solo una referencia manual — el panel no puede saber automáticamente quién respondió cada mensaje.
+    </div>
+
+    <% shifts.forEach(function(shift) { %>
+      <div class="shift-card" id="shift-<%= shift.id %>">
+        <div class="shift-title"><%= shift.name %></div>
+        <div class="shift-fields">
+          <div class="field full">
+            <label>Nombre del turno</label>
+            <input type="text" class="f-name" value="<%= shift.name %>">
+          </div>
+          <div class="field">
+            <label>Hora inicio</label>
+            <input type="number" class="f-start" min="0" max="23" value="<%= shift.start_hour %>">
+          </div>
+          <div class="field">
+            <label>Hora fin</label>
+            <input type="number" class="f-end" min="0" max="23" value="<%= shift.end_hour %>">
+          </div>
+          <div class="field full">
+            <label>Empleado/a a cargo (referencia)</label>
+            <input type="text" class="f-employee" value="<%= shift.employee_name %>" placeholder="Ej. Juana Pérez">
+          </div>
+        </div>
+        <div class="shift-footer">
+          <span class="shift-status" id="status-<%= shift.id %>"></span>
+          <button class="shift-save" onclick="guardarTurno(<%= shift.id %>)">Guardar</button>
+        </div>
+      </div>
+    <% }); %>
+  </main>
+
+  <script>
+    async function guardarTurno(id) {
+      const card   = document.getElementById('shift-' + id);
+      const status = document.getElementById('status-' + id);
+      const body = {
+        name:          card.querySelector('.f-name').value,
+        start_hour:    card.querySelector('.f-start').value,
+        end_hour:      card.querySelector('.f-end').value,
+        employee_name: card.querySelector('.f-employee').value,
+      };
+      try {
+        const r = await fetch('/turnos/' + id, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const d = await r.json();
+        status.textContent = d.ok ? 'Guardado ✓' : 'Error';
+        setTimeout(() => status.textContent = '', 2500);
+      } catch (_) {
+        status.textContent = 'Error de red';
+      }
+    }
+  </script>
+</body>
+</html>

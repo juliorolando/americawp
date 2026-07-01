@@ -87,7 +87,7 @@
     <a href="/contactos">Contactos</a>
     <a href="/estadisticas" class="active">Estadísticas</a>
     <a href="/buscar">Buscar</a>
-    <% if (isAdmin) { %><a href="/ocultos">Ocultos</a><% } %>
+    <% if (isAdmin) { %><a href="/ocultos">Ocultos</a><a href="/turnos">Turnos</a><% } %>
   </nav>
 
   <main>
@@ -120,6 +120,14 @@
       <div class="sum-card">
         <div class="sum-label">Total contactos</div>
         <div class="sum-value"><%= data.totalChats.toLocaleString('es-AR') %></div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Resp. promedio</div>
+        <div class="sum-value"><%= data.response.avgResponseMin !== null ? data.response.avgResponseMin + ' min' : '—' %></div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Chats abandonados (+24h)</div>
+        <div class="sum-value" style="<%= data.abandoned > 0 ? 'color:#e53935;' : '' %>"><%= data.abandoned %></div>
       </div>
     </div>
 
@@ -183,6 +191,31 @@
         <p style="font-size:.75rem;color:#888;margin-top:12px;">
           Día más activo: <strong><%= bdLbl %></strong> con <strong><%= busyDay.count %></strong> mensajes
         </p>
+      <% } %>
+    </div>
+
+    <!-- Tiempo de respuesta por turno -->
+    <div class="section">
+      <div class="section-title">Tiempo de respuesta por turno</div>
+      <% if (data.response.count === 0) { %>
+        <div class="empty-chart">Sin datos aún</div>
+      <% } else { %>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <% data.response.byShift.forEach(function(s) { %>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f7f8f9;border-radius:8px;">
+              <div>
+                <div style="font-weight:600;font-size:.85rem;color:#333;"><%= s.shiftName %></div>
+                <div style="font-size:.72rem;color:#999;margin-top:2px;"><%= s.count %> respuesta<%= s.count !== 1 ? 's' : '' %></div>
+              </div>
+              <div style="font-size:1.1rem;font-weight:700;color:#128C7E;">
+                <%= s.avgResponseMin !== null ? s.avgResponseMin + ' min' : '—' %>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+        <% if (isAdmin) { %>
+        <p style="font-size:.72rem;color:#bbb;margin-top:10px;">Configurá los horarios de cada turno en <a href="/turnos" style="color:#128C7E;">Turnos</a>.</p>
+        <% } %>
       <% } %>
     </div>
 

@@ -6,7 +6,8 @@ const path    = require('path');
 const { getChats, getChat, getMessages, upsertChat, saveMessage, saveMessagesBatch,
         getStats, getPendingChats, searchMessages, getActivityStats,
         hideChat, unhideChat, getHiddenChats,
-        setStatus, setNotes, setSummary, getContacts, clearDatabase } = require('./db');
+        setStatus, setNotes, setSummary, getContacts, clearDatabase,
+        getShifts, saveShift, setQuality, getResponseTimeStats, getAbandonedCount } = require('./db');
 
 // Devuelve solo los mensajes de la sesión actual (último bloque sin gap > 12 h)
 function currentSession(messages) {
@@ -227,6 +228,60 @@ app.post('/chat/:id/summarize', requireAuth, async (req, res) => {
   }
 });
 
+app.post('/chat/:id/analyze-quality', requireAuth, async (req, res) => {
+  const chat = getChat(req.params.id);
+  if (!chat) return res.status(404).json({ ok: false, error: 'Chat no encontrado' });
+
+  const messages = getMessages(req.params.id);
+  if (!messages.length) return res.json({ ok: false, error: 'Sin mensajes' });
+
+  const session = currentSession(messages);
+  if (!session.length) return res.json({ ok: false, error: 'Sin mensajes en la sesión actual' });
+
+  const convo = session.map(m =>
+    `[${m.direction === 'in' ? 'CLIENTE' : 'RECEPCIÓN'}] ${m.body}`
+  ).join('\n');
+
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          {
+            role: 'system',
+            content: 'Sos un supervisor de calidad que audita cómo el personal de recepción de un hotel (mensajes [RECEPCIÓN]) atendió a un cliente ([CLIENTE]) por WhatsApp. Evaluá SOLO al personal, no al cliente: tono inadecuado o brusco, si no saludó o no se despidió, si ignoró un reclamo o pedido urgente, o cualquier respuesta fuera de protocolo. Respondé siempre en español. La PRIMERA línea de tu respuesta debe ser exactamente la palabra OK (si la atención estuvo bien) o REVISAR (si hay algo que un supervisor debería revisar), sin nada más en esa línea. Desde la segunda línea, escribí 1-2 oraciones cortas justificando el veredicto.',
+          },
+          {
+            role: 'user',
+            content: `Conversación con el contacto "${chat.phone_or_name}":\n\n${convo}`,
+          },
+        ],
+        max_tokens: 180,
+        temperature: 0.2,
+      }),
+    });
+    const data = await r.json();
+    const raw = data.choices?.[0]?.message?.content?.trim();
+    if (!raw) return res.json({ ok: false, error: 'Sin respuesta del modelo' });
+
+    const lines = raw.split('\n');
+    const verdict = lines[0].trim().toUpperCase();
+    const flag = verdict.startsWith('REVISAR') ? 'revisar' : 'ok';
+    const notes = lines.slice(1).join('\n').trim() || raw;
+
+    setQuality(req.params.id, flag, notes);
+    res.json({ ok: true, flag, notes });
+  } catch (err) {
+    console.error('[AI] Error Groq (calidad):', err.message);
+    res.status(500).json({ ok: false, error: 'Error al conectar con Groq' });
+  }
+});
+
 app.post('/chat/:id/show', requireAdmin, (req, res) => {
   unhideChat(req.params.id);
   res.redirect('/ocultos');
@@ -253,11 +308,28 @@ app.get('/ocultos', requireAdmin, (req, res) => {
   res.render('ocultos', { chats });
 });
 
+app.get('/turnos', requireAdmin, (req, res) => {
+  const shifts = getShifts();
+  res.render('turnos', { shifts });
+});
+
+app.post('/turnos/:id', requireAdmin, (req, res) => {
+  const { name, start_hour, end_hour, employee_name } = req.body;
+  const startH = parseInt(start_hour, 10);
+  const endH   = parseInt(end_hour, 10);
+  if (!name || Number.isNaN(startH) || Number.isNaN(endH) || startH < 0 || startH > 23 || endH < 0 || endH > 23) {
+    return res.status(400).json({ ok: false, error: 'Datos inválidos' });
+  }
+  saveShift(req.params.id, { name, start_hour: startH, end_hour: endH, employee_name: employee_name || '' });
+  res.json({ ok: true });
+});
+
 // ---------------------------------------------------------------------------
 // Panel (protegido)
 // ---------------------------------------------------------------------------
 app.get('/', requireAuth, (req, res) => {
   const chats = getChats();
+  chats.forEach(c => { c.category = categorize(c.sample_text); });
   const stats = getStats();
   res.render('index', { chats, stats });
 });
@@ -283,6 +355,8 @@ app.get('/estadisticas', requireAuth, (req, res) => {
   }
 
   const data = getActivityStats({ from: fromTs, to: toTs });
+  data.response = getResponseTimeStats({ from: fromTs, to: toTs });
+  data.abandoned = getAbandonedCount();
   res.render('estadisticas', { data, from: from || '', to: to || '', preset: preset || '' });
 });
 

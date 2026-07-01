@@ -27,7 +27,26 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_messages_chat_id   ON messages(chat_id);
   CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
   CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_wa_id ON messages(wa_id) WHERE wa_id IS NOT NULL;
+
+  CREATE TABLE IF NOT EXISTS shifts (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT    NOT NULL,
+    start_hour    INTEGER NOT NULL,
+    end_hour      INTEGER NOT NULL,
+    employee_name TEXT    NOT NULL DEFAULT ''
+  );
 `);
+
+// Seed inicial de turnos (solo si la tabla está vacía)
+try {
+  const shiftCount = db.prepare('SELECT COUNT(*) AS n FROM shifts').get().n;
+  if (shiftCount === 0) {
+    const insertShift = db.prepare('INSERT INTO shifts (name, start_hour, end_hour, employee_name) VALUES (?, ?, ?, ?)');
+    insertShift.run('Mañana', 6, 14, '');
+    insertShift.run('Tarde', 14, 22, '');
+    insertShift.run('Noche', 22, 6, '');
+  }
+} catch (_) {}
 
 // Migración: agregar wa_id a bases de datos existentes sin la columna
 try {
@@ -53,6 +72,12 @@ try {
   if (!chatCols.find(c => c.name === 'ai_summary')) {
     db.exec("ALTER TABLE chats ADD COLUMN ai_summary TEXT NOT NULL DEFAULT ''");
   }
+  if (!chatCols.find(c => c.name === 'quality_flag')) {
+    db.exec("ALTER TABLE chats ADD COLUMN quality_flag TEXT NOT NULL DEFAULT ''");
+  }
+  if (!chatCols.find(c => c.name === 'quality_notes')) {
+    db.exec("ALTER TABLE chats ADD COLUMN quality_notes TEXT NOT NULL DEFAULT ''");
+  }
 } catch (_) {}
 
 const stmts = {
@@ -69,6 +94,7 @@ const stmts = {
       c.last_seen,
       c.status,
       c.ai_summary,
+      c.quality_flag,
       COUNT(m.id) AS message_count,
       (SELECT body      FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_message,
       (SELECT direction FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_direction,
@@ -82,6 +108,9 @@ const stmts = {
   `),
   getChat:     db.prepare('SELECT * FROM chats WHERE id = ?'),
   getMsgs:     db.prepare('SELECT * FROM messages WHERE chat_id = ? ORDER BY timestamp ASC, id ASC'),
+  listShifts:  db.prepare('SELECT * FROM shifts ORDER BY start_hour ASC'),
+  saveShift:   db.prepare('UPDATE shifts SET name = ?, start_hour = ?, end_hour = ?, employee_name = ? WHERE id = ?'),
+  setQuality:  db.prepare('UPDATE chats SET quality_flag = ?, quality_notes = ? WHERE id = ?'),
 };
 
 function upsertChat(phoneOrName) {
@@ -195,6 +224,70 @@ function getActivityStats({ from = null, to = null } = {}) {
   return { byHour, byDay, total, totalChats };
 }
 
+function getShifts() { return stmts.listShifts.all(); }
+
+function saveShift(id, { name, start_hour, end_hour, employee_name }) {
+  stmts.saveShift.run(name, start_hour, end_hour, employee_name || '', id);
+}
+
+// Turno al que pertenece una hora (0-23), contemplando turnos que cruzan medianoche (ej. 22 -> 6)
+function shiftForHour(hour, shifts) {
+  return shifts.find(s =>
+    s.start_hour < s.end_hour
+      ? hour >= s.start_hour && hour < s.end_hour
+      : hour >= s.start_hour || hour < s.end_hour
+  ) || null;
+}
+
+function setQuality(id, flag, notes) { stmts.setQuality.run(flag, notes || '', id); }
+
+// Tiempo de respuesta agregado: reproduce el algoritmo par in->out de chat.ejs pero sobre todos los chats
+function getResponseTimeStats({ from = null, to = null } = {}) {
+  const hasRange = from !== null && to !== null;
+  const rows = hasRange
+    ? db.prepare('SELECT chat_id, direction, timestamp FROM messages WHERE timestamp >= ? AND timestamp <= ? ORDER BY chat_id ASC, timestamp ASC').all(from, to)
+    : db.prepare('SELECT chat_id, direction, timestamp FROM messages ORDER BY chat_id ASC, timestamp ASC').all();
+
+  const deltas = []; // { deltaMs, hour }
+  let currentChat = null, lastInTs = null;
+  for (const row of rows) {
+    if (row.chat_id !== currentChat) { currentChat = row.chat_id; lastInTs = null; }
+    if (row.direction === 'in') {
+      lastInTs = row.timestamp;
+    } else if (row.direction === 'out' && lastInTs !== null) {
+      const hour = new Date(row.timestamp).getHours();
+      deltas.push({ deltaMs: row.timestamp - lastInTs, hour });
+      lastInTs = null;
+    }
+  }
+
+  const avgResponseMin = deltas.length
+    ? Math.round(deltas.reduce((sum, d) => sum + d.deltaMs, 0) / deltas.length / 60000)
+    : null;
+
+  const shifts  = getShifts();
+  const byShift = shifts.map(s => {
+    const inShift = deltas.filter(d => shiftForHour(d.hour, shifts)?.id === s.id);
+    const avg     = inShift.length
+      ? Math.round(inShift.reduce((sum, d) => sum + d.deltaMs, 0) / inShift.length / 60000)
+      : null;
+    return { shiftName: s.name, avgResponseMin: avg, count: inShift.length };
+  });
+
+  return { avgResponseMin, count: deltas.length, byShift };
+}
+
+function getAbandonedCount({ thresholdHours = 24 } = {}) {
+  const cutoff = Date.now() - thresholdHours * 60 * 60 * 1000;
+  return db.prepare(`
+    SELECT COUNT(*) AS n FROM chats c
+    WHERE c.hidden = 0
+      AND c.status != 'resuelto'
+      AND (SELECT direction FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) = 'in'
+      AND (SELECT timestamp FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) <= ?
+  `).get(cutoff).n;
+}
+
 function getStats() {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -265,4 +358,4 @@ function getHiddenChats() {
   `).all();
 }
 
-module.exports = { db, upsertChat, saveMessage, saveMessagesBatch, getChats, getMessages, getChat, getStats, getPendingChats, searchMessages, getActivityStats, getContacts, hideChat, unhideChat, getHiddenChats, setStatus, setNotes, setSummary, clearDatabase };
+module.exports = { db, upsertChat, saveMessage, saveMessagesBatch, getChats, getMessages, getChat, getStats, getPendingChats, searchMessages, getActivityStats, getContacts, hideChat, unhideChat, getHiddenChats, setStatus, setNotes, setSummary, clearDatabase, getShifts, saveShift, shiftForHour, setQuality, getResponseTimeStats, getAbandonedCount };
